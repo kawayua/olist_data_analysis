@@ -1,0 +1,39 @@
+[project]
+name = "olist-analytics-platform"
+version = "0.1.0"
+description = "E-commerce growth, retention, and repurchase analytics platform"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "joblib>=1.4",
+  "lightgbm>=4.5",
+  "openai>=1.50",
+  "pandas>=2.2",
+  "plotly>=5.24",
+  "psycopg[binary]>=3.2",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.5",
+  "pyyaml>=6.0",
+  "scikit-learn>=1.5",
+  "sqlalchemy>=2.0",
+  "sqlglot>=25",
+  "streamlit>=1.40",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
