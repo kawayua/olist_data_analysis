@@ -1,0 +1,28 @@
+datasets:
+  customers:
+    filename: olist_customers_dataset.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+  orders:
+    filename: olist_orders_dataset.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+  order_items:
+    filename: olist_order_items_dataset.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+  payments:
+    filename: olist_order_payments_dataset.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+  reviews:
+    filename: olist_order_reviews_dataset.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+  products:
+    filename: olist_products_dataset.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+  sellers:
+    filename: olist_sellers_dataset.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+  geolocation:
+    filename: olist_geolocation_dataset.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+  category_translation:
+    filename: product_category_name_translation.csv
+    source: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
