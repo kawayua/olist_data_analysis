@@ -41,5 +41,52 @@ def test_display_dataframe_renames_without_mutating_source():
     assert list(source.columns) == ["item_revenue", "customer_state"]
 
 
+def test_display_dataframe_localizes_state_and_delivery_metrics_without_mutation():
+    source = pd.DataFrame(
+        {
+            "payment_value": [120.0],
+            "item_revenue_aov": [100.0],
+            "delayed_delivery_rate_pct": [12.5],
+            "first_purchase_customer_count": [8],
+            "eligible_first_purchase_customer_count": [7],
+            "eligible_first_purchase_customers": [7],
+            "repurchased_first_purchase_customers": [3],
+            "repurchase_rate_90d_pct": [42.857],
+            "average_delivery_days": [9.2],
+            "median_delivery_days": [8.7],
+            "average_delivery_vs_estimate_days": [-1.1],
+        }
+    )
+
+    displayed = display_dataframe(source)
+
+    assert list(displayed.columns) == [
+        "支付金额",
+        "商品金额客单价",
+        "延迟送达率（%）",
+        "首购客户数",
+        "符合条件的首购客户数",
+        "符合条件的首购客户数",
+        "已复购首购客户数",
+        "90天复购率（%）",
+        "平均配送天数",
+        "配送天数中位数",
+        "平均配送较预计天数",
+    ]
+    assert list(source.columns) == [
+        "payment_value",
+        "item_revenue_aov",
+        "delayed_delivery_rate_pct",
+        "first_purchase_customer_count",
+        "eligible_first_purchase_customer_count",
+        "eligible_first_purchase_customers",
+        "repurchased_first_purchase_customers",
+        "repurchase_rate_90d_pct",
+        "average_delivery_days",
+        "median_delivery_days",
+        "average_delivery_vs_estimate_days",
+    ]
+
+
 def test_display_label_keeps_unknown_column_name():
     assert display_label("unmapped_metric") == "unmapped_metric"

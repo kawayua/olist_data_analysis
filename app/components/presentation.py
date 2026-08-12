@@ -4,6 +4,8 @@ import pandas as pd
 
 CHINESE_COLUMNS = {
     "item_revenue": "商品金额",
+    "payment_value": "支付金额",
+    "item_revenue_aov": "商品金额客单价",
     "order_count": "订单数",
     "customer_count": "客户数",
     "customer_state": "客户所在州",
@@ -11,6 +13,15 @@ CHINESE_COLUMNS = {
     "customer_segment": "客户分群",
     "delivery_status": "履约状态",
     "average_review_score": "平均评分",
+    "delayed_delivery_rate_pct": "延迟送达率（%）",
+    "average_delivery_days": "平均配送天数",
+    "median_delivery_days": "配送天数中位数",
+    "average_delivery_vs_estimate_days": "平均配送较预计天数",
+    "first_purchase_customer_count": "首购客户数",
+    "eligible_first_purchase_customer_count": "符合条件的首购客户数",
+    "eligible_first_purchase_customers": "符合条件的首购客户数",
+    "repurchased_first_purchase_customers": "已复购首购客户数",
+    "repurchase_rate_90d_pct": "90天复购率（%）",
     "month_start": "月份",
     "retention_rate_pct": "留存率（%）",
 }
