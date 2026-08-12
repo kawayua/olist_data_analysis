@@ -19,9 +19,9 @@ def format_kpi_value(
     return f"{prefix}{value:,.{decimals}f}{suffix}"
 
 
-def render_kpis(items: Sequence[tuple[str, float | int | None, str]]) -> None:
-    """Render label, formatted value, and optional supporting text for KPIs."""
+def render_kpis(items: Sequence[tuple[str, str, str]]) -> None:
+    """Render label, preformatted value, and supporting text for KPIs."""
     columns = st.columns(len(items))
     for column, (label, value, help_text) in zip(columns, items, strict=True):
         with column:
-            render_kpi_card(label, format_kpi_value(value), help_text)
+            render_kpi_card(label, value, help_text)

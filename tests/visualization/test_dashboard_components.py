@@ -1,7 +1,7 @@
 import pandas as pd
 
 from app.components.filters import DashboardFilters
-from app.components.kpis import format_kpi_value
+from app.components.kpis import format_kpi_value, render_kpis
 from app.components.presentation import display_dataframe, display_label
 
 
@@ -26,6 +26,10 @@ def test_dashboard_filters_convert_to_repository_filters():
 def test_format_kpi_value_handles_numbers_and_missing_values():
     assert format_kpi_value(1234.5, prefix="R$", decimals=1) == "R$1,234.5"
     assert format_kpi_value(None) == "—"
+
+
+def test_render_kpis_accepts_preformatted_page_values():
+    render_kpis([("商品金额", "R$1,234", "已送达订单")])
 
 
 def test_display_dataframe_renames_without_mutating_source():
