@@ -13,10 +13,12 @@ def main() -> None:
     from src.database import get_engine, run_sql, run_sql_file
 
     engine = get_engine(get_settings())
+    run_sql(engine, "DROP TABLE IF EXISTS marts.customer_360")
     run_sql(engine, "DROP TABLE IF EXISTS marts.cohort_retention")
-    path = PROJECT_ROOT / "sql" / "marts" / "031_cohort_retention.sql"
-    run_sql_file(engine, path)
-    print(f"Applied {path.relative_to(PROJECT_ROOT).as_posix()}")
+    for filename in ("031_cohort_retention.sql", "032_customer_360.sql"):
+        path = PROJECT_ROOT / "sql" / "marts" / filename
+        run_sql_file(engine, path)
+        print(f"Applied {path.relative_to(PROJECT_ROOT).as_posix()}")
 
 
 if __name__ == "__main__":

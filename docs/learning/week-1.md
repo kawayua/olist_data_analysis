@@ -315,3 +315,19 @@ Day 8 的工程目标是把 Day 6-7 在 Navicat 中验证的 staging、维度表
 抽样查看第 1–3 月留存时发现，只有 1 位或 262 位客户的早期 Cohort 出现 0% 或 100% 的大幅波动，不能与数千人的 Cohort 做等权比较。2018 年 Cohort 的第 1 月留存约为 0.350%–0.593%，后续月通常进一步下降。汇总留存曲线应按 Cohort 客户数加权，即 `SUM(retained_customers) / SUM(cohort_customers)`，使每位客户而非每个 Cohort 拥有相同权重。
 
 按客户数加权的完整观察月留存为：第 1 月 0.480%（390/81,265）、第 2 月 0.341%（257/75,387）、第 3 月 0.261%（180/68,881）、第 4 月 0.268%（167/62,299）、第 5 月 0.238%（132/55,525）、第 6 月 0.236%（116/49,237）。第 4 月略高于第 3 月不构成矛盾，因为指标是“该月是否再次购买”的期间活跃率，而不是要求逐月连续活跃的生存率；可用于每个相对月的完整 Cohort 数从 21 下降至 16，体现观察期资格过滤。
+
+## Day 10：Customer 360 与 RFM 分群
+
+RFM 仅使用 `delivered` 订单：Recency 为全局观察截止点到最近一次已送达购买的天数，Frequency 为已送达订单数，Monetary 为订单级 `item_revenue` 的累计商品金额。Monetary 不混入运费，也不从支付明细与订单商品明细的直接连接中计算，以避免再次引入金额重复；开始分群前需先检查 Frequency 是否大量集中为 1，决定不能盲目使用普通分位数分箱。
+
+Frequency 分布高度偏斜：90,557 位客户（97.000%）仅有 1 笔已送达订单，2,573 位有 2 笔，181 位有 3 笔，最高为 15 笔。仅 2,801 位客户有至少两笔订单，因此普通 `qcut` 或四分位分箱会因重复的 `F=1` 边界而失去区分能力。后续分群将保留原始 Frequency，并明确标记单次购买客户，而不是用貌似精确但不稳定的频次分位数。
+
+Recency 分位数为 0、113、218、345、713 天；客户累计商品金额的 25/50/75 分位数为 47.65、89.73、154.7375，最高为 13,440.00。R 与 M 可使用四分位分数：更近购买或更高金额得分更高；Frequency 不做分位数，而保留原始订单数并按 `1`、`2`、`3+` 形成稳定业务规则。消费额最高值远高于上四分位，表明客户价值高度集中，分群结论需同时报告人数和金额贡献。
+
+策略分群结果为：`needs_attention` 23,003 位（24.640%）贡献 5,441,216.62 商品金额（41.154%）；`potential` 22,360 位（23.951%）贡献 5,179,383.45（39.174%）；`one_time_low_value` 46,221 位（49.509%）贡献 2,177,855.24（16.472%）；`high_value` 仅 1,316 位（1.410%）贡献 394,634.49（2.985%）；其余 `standard` 为 458 位。高价值但沉默、以及近期高金额未复购的两类客户合计占 48.591% 客户却贡献 80.328% 商品金额，是后续运营策略最应优先验证的对象。
+
+已将该探索规则固化为 `marts.customer_360`，粒度为一行一位至少有一笔已送达订单的客户，主键为 `customer_key`，并外键关联 `warehouse.dim_customer`。字段为：`customer_key` (`bigint`), `snapshot_at` (`timestamp`), `first_purchase_at` (`timestamp`), `last_purchase_at` (`timestamp`), `recency_days` (`integer`), `frequency_orders` (`bigint`), `monetary_item_revenue` (`numeric`), `freight_revenue` (`numeric`), `payment_value` (`numeric`), `distinct_category_count` (`bigint`), `avg_review_score` (`numeric`), `avg_delivery_days` (`numeric`), `r_score` (`integer`), `f_score` (`integer`), `m_score` (`integer`), `customer_segment` (`text`), `eligible_for_90d` (`boolean`), `repurchased_within_90d` (`boolean`)。其中 `snapshot_at` 是全局数据观察截止时间；`repurchased_within_90d` 只在 `eligible_for_90d = true` 时才有真/假值，否则为 `NULL`，从而避免将观察期不足的客户误标为未复购。
+
+永久表重建后的分群为：`high_value` 1,310 位、商品金额 393,299.50；`potential` 22,290 位、5,162,935.18；`needs_attention` 23,079 位、5,458,999.88；`one_time_low_value` 46,221 位、2,177,855.24；`standard` 458 位、28,408.31。与临时探索统计存在少量差异时，应以版本控制的正式 SQL 和可重复构建结果为准，而非复制过的临时查询。
+
+首次实现将 90 天标签写成每个客户一条相关子查询，构建长时间运行并出现临时文件 I/O。排查 PostgreSQL 活动会话后确认，停止外层测试不会自动停止其子进程；应先取消遗留数据库查询。性能修复不是简单加超时，而是将复购判断改为 `repurchase_labels` 预聚合 CTE：先在客户粒度计算 90 天内是否存在后续订单，再连接到 Customer 360。重建测试恢复为约 2 秒，说明在分析 SQL 中必须优先控制扫描次数和连接粒度。
