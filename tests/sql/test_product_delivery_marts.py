@@ -123,3 +123,44 @@ def test_delivery_order_analysis_has_one_row_per_delivered_order():
     assert duplicates == 0
     assert invalid_statuses == 0
     assert invalid_labels == 0
+
+
+def test_state_performance_has_one_row_per_customer_state_and_valid_rates():
+    project_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "scripts/build_marts.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Applied sql/marts/036_state_performance.sql" in result.stdout
+
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        rows, duplicates, invalid_rates = connection.execute(
+            text(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM marts.state_performance),
+                    (
+                        SELECT COUNT(*) - COUNT(DISTINCT customer_state)
+                        FROM marts.state_performance
+                    ),
+                    (
+                        SELECT COUNT(*)
+                        FROM marts.state_performance
+                        WHERE delayed_delivery_rate_pct < 0
+                           OR delayed_delivery_rate_pct > 100
+                           OR repurchase_rate_90d_pct < 0
+                           OR repurchase_rate_90d_pct > 100
+                    )
+                """
+            )
+        ).one()
+
+    assert rows > 0
+    assert duplicates == 0
+    assert invalid_rates == 0
