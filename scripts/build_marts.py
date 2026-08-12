@@ -13,9 +13,18 @@ def main() -> None:
     from src.database import get_engine, run_sql, run_sql_file
 
     engine = get_engine(get_settings())
+    run_sql(engine, "DROP TABLE IF EXISTS marts.customer_segment_strategy")
     run_sql(engine, "DROP TABLE IF EXISTS marts.customer_360")
+    run_sql(engine, "DROP TABLE IF EXISTS marts.repurchase_horizons")
     run_sql(engine, "DROP TABLE IF EXISTS marts.cohort_retention")
-    for filename in ("031_cohort_retention.sql", "032_customer_360.sql"):
+    run_sql(engine, "DROP TABLE IF EXISTS marts.monthly_growth")
+    for filename in (
+        "030_monthly_growth.sql",
+        "031_cohort_retention.sql",
+        "031_repurchase_horizons.sql",
+        "032_customer_360.sql",
+        "032_customer_segment_strategy.sql",
+    ):
         path = PROJECT_ROOT / "sql" / "marts" / filename
         run_sql_file(engine, path)
         print(f"Applied {path.relative_to(PROJECT_ROOT).as_posix()}")

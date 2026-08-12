@@ -1,0 +1,89 @@
+metrics:
+  gmv:
+    label: GMV（实付金额）
+    description: 已送达订单的订单级实付金额总和。
+    formula: SUM(warehouse.fact_orders.payment_value)
+    unit: currency
+    grain: order
+    filters: order_status = delivered
+    denominator: 不适用
+  item_revenue:
+    label: 商品销售额
+    description: 已送达订单的商品金额总和，不含运费。
+    formula: SUM(warehouse.fact_orders.item_revenue)
+    unit: currency
+    grain: order
+    filters: order_status = delivered
+    denominator: 不适用
+  orders:
+    label: 订单数
+    description: 已送达订单数量。
+    formula: COUNT(DISTINCT order_id)
+    unit: count
+    grain: month
+    filters: order_status = delivered
+    denominator: 不适用
+  customers:
+    label: 活跃客户数
+    description: 至少有一笔已送达订单的去重客户数。
+    formula: COUNT(DISTINCT customer_key)
+    unit: count
+    grain: month
+    filters: order_status = delivered
+    denominator: 不适用
+  item_revenue_aov:
+    label: 商品金额客单价
+    description: 每笔已送达订单的平均商品金额。
+    formula: SUM(item_revenue) / COUNT(DISTINCT order_id)
+    unit: currency
+    grain: month
+    filters: order_status = delivered
+    denominator: 已送达订单数；订单数为 0 时为 NULL
+  new_customers:
+    label: 新客户数
+    description: 首次已送达购买发生在当月的客户数。
+    formula: COUNT(DISTINCT customer_key WHERE first_purchase_month = month)
+    unit: count
+    grain: month
+    filters: order_status = delivered
+    denominator: 不适用
+  returning_customers:
+    label: 老客户数
+    description: 当月有已送达订单且首次已送达购买早于当月的客户数。
+    formula: COUNT(DISTINCT customer_key WHERE first_purchase_month < month)
+    unit: count
+    grain: month
+    filters: order_status = delivered
+    denominator: 不适用
+  repeat_rate_30d:
+    label: 30天复购率
+    description: 首购后30天内再次已送达购买的客户比例。
+    formula: repurchased_within_30d / eligible_for_30d
+    unit: percent
+    grain: customer
+    filters: delivered orders only
+    denominator: 仅使用具有完整30天观察期的首购客户
+  repeat_rate_60d:
+    label: 60天复购率
+    description: 首购后60天内再次已送达购买的客户比例。
+    formula: repurchased_within_60d / eligible_for_60d
+    unit: percent
+    grain: customer
+    filters: delivered orders only
+    denominator: 仅使用具有完整60天观察期的首购客户
+  repeat_rate_90d:
+    label: 90天复购率
+    description: 首购后90天内再次已送达购买的客户比例。
+    formula: repurchased_within_90d / eligible_for_90d
+    unit: percent
+    grain: customer
+    filters: delivered orders only
+    denominator: 仅使用具有完整90天观察期的首购客户
+  late_delivery_rate:
+    label: 延迟送达率
+    description: 已送达订单中实际送达晚于预计送达的比例。
+    formula: COUNT(order_id WHERE is_delivery_late) / COUNT(delivered order_id)
+    unit: percent
+    grain: month
+    filters: order_status = delivered
+    denominator: 已送达订单数

@@ -131,6 +131,7 @@ segmented AS (
 SELECT
     segmented.customer_key,
     segmented.snapshot_at,
+    segmented.snapshot_at AS feature_available_at,
     segmented.first_purchase_at,
     segmented.last_purchase_at,
     segmented.recency_days,
@@ -145,10 +146,12 @@ SELECT
     segmented.f_score,
     segmented.m_score,
     segmented.customer_segment,
-    data_end.as_of_timestamp >= segmented.first_purchase_at + INTERVAL '90 days'
+    data_end.as_of_timestamp::date >= segmented.first_purchase_at::date
+        + INTERVAL '90 days'
         AS eligible_for_90d,
     CASE
-        WHEN data_end.as_of_timestamp < segmented.first_purchase_at + INTERVAL '90 days'
+        WHEN data_end.as_of_timestamp::date < segmented.first_purchase_at::date
+            + INTERVAL '90 days'
             THEN NULL
         ELSE labels.repurchased_within_90d
     END AS repurchased_within_90d
