@@ -2,6 +2,7 @@ import pandas as pd
 
 from src.analytics.retention import (
     build_retention_matrix,
+    compare_binary_proportions,
     eligible_for_horizon,
     wilson_interval,
 )
@@ -42,3 +43,21 @@ def test_wilson_interval_bounds_a_rate():
     lower, upper = wilson_interval(successes=15, total=100)
 
     assert 0 < lower < 0.15 < upper < 1
+
+
+def test_binary_proportion_comparison_reports_difference_interval_and_test():
+    result = compare_binary_proportions(
+        group_zero_successes=20,
+        group_zero_total=100,
+        group_one_successes=10,
+        group_one_total=100,
+    )
+
+    assert result.group_zero_rate == 0.2
+    assert result.group_one_rate == 0.1
+    assert result.absolute_difference == -0.1
+    assert result.relative_difference_pct == -50.0
+    assert result.absolute_difference_ci_lower < result.absolute_difference
+    assert result.absolute_difference_ci_upper > result.absolute_difference
+    assert 0.0 <= result.p_value <= 1.0
+    assert result.test_name == "Fisher's exact test (two-sided)"

@@ -1,6 +1,26 @@
+from dataclasses import dataclass
 from math import sqrt
 
 import pandas as pd
+from scipy.stats import fisher_exact
+
+
+@dataclass(frozen=True)
+class BinaryProportionComparison:
+    """Comparison of binary outcome rates for two independent groups."""
+
+    group_zero_successes: int
+    group_zero_total: int
+    group_one_successes: int
+    group_one_total: int
+    group_zero_rate: float
+    group_one_rate: float
+    absolute_difference: float
+    relative_difference_pct: float
+    absolute_difference_ci_lower: float
+    absolute_difference_ci_upper: float
+    p_value: float
+    test_name: str
 
 
 def eligible_for_horizon(
@@ -23,6 +43,61 @@ def wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float,
     center = (rate + z**2 / (2 * total)) / denominator
     margin = z * sqrt(rate * (1 - rate) / total + z**2 / (4 * total**2))
     return center - margin / denominator, center + margin / denominator
+
+
+def compare_binary_proportions(
+    group_zero_successes: int,
+    group_zero_total: int,
+    group_one_successes: int,
+    group_one_total: int,
+) -> BinaryProportionComparison:
+    """Compare independent binary rates with a Wald difference interval and Fisher test."""
+    counts = (
+        group_zero_successes,
+        group_zero_total,
+        group_one_successes,
+        group_one_total,
+    )
+    if any(count < 0 for count in counts):
+        raise ValueError("counts must be non-negative")
+    if group_zero_total == 0 or group_one_total == 0:
+        raise ValueError("both group totals must be positive")
+    if group_zero_successes > group_zero_total or group_one_successes > group_one_total:
+        raise ValueError("successes cannot exceed totals")
+
+    group_zero_rate = group_zero_successes / group_zero_total
+    group_one_rate = group_one_successes / group_one_total
+    absolute_difference = group_one_rate - group_zero_rate
+    standard_error = sqrt(
+        group_zero_rate * (1 - group_zero_rate) / group_zero_total
+        + group_one_rate * (1 - group_one_rate) / group_one_total
+    )
+    p_value = fisher_exact(
+        [
+            [group_zero_successes, group_zero_total - group_zero_successes],
+            [group_one_successes, group_one_total - group_one_successes],
+        ],
+        alternative="two-sided",
+    ).pvalue
+    if group_zero_rate == 0:
+        relative_difference_pct = float("nan")
+    else:
+        relative_difference_pct = absolute_difference / group_zero_rate * 100
+
+    return BinaryProportionComparison(
+        group_zero_successes=group_zero_successes,
+        group_zero_total=group_zero_total,
+        group_one_successes=group_one_successes,
+        group_one_total=group_one_total,
+        group_zero_rate=group_zero_rate,
+        group_one_rate=group_one_rate,
+        absolute_difference=absolute_difference,
+        relative_difference_pct=relative_difference_pct,
+        absolute_difference_ci_lower=absolute_difference - 1.96 * standard_error,
+        absolute_difference_ci_upper=absolute_difference + 1.96 * standard_error,
+        p_value=float(p_value),
+        test_name="Fisher's exact test (two-sided)",
+    )
 
 
 def build_retention_matrix(activity: pd.DataFrame) -> pd.DataFrame:
