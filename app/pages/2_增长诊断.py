@@ -5,6 +5,11 @@ import streamlit as st
 
 from app.components.filters import DashboardFilters, render_filters
 from app.components.kpis import format_kpi_value, render_kpis
+from app.components.layout import (
+    apply_dashboard_theme,
+    render_insight,
+    render_page_header,
+)
 from app.Home import get_repository
 from src.visualization.charts import line_chart
 
@@ -14,7 +19,12 @@ def load_monthly_growth(filters: DashboardFilters) -> pd.DataFrame:
     return get_repository().monthly_growth(filters.to_repository_filters())
 
 
-st.title("增长诊断")
+apply_dashboard_theme()
+render_page_header(
+    "增长诊断",
+    "观察月度商品金额、新客和回访客户的变化。",
+    "默认排除不完整月份；州和品类筛选不适用于全局月度趋势。",
+)
 filters = render_filters(get_repository())
 frame = load_monthly_growth(filters)
 if frame.empty:
@@ -23,9 +33,17 @@ else:
     latest = frame.iloc[-1]
     render_kpis(
         [
-            ("最新商品金额", format_kpi_value(latest.item_revenue, prefix="R$"), "完整月份"),
+            (
+                "最新商品金额",
+                format_kpi_value(latest.item_revenue, prefix="R$"),
+                "完整月份",
+            ),
             ("新客户", format_kpi_value(latest.new_customers), "首次购买客户"),
-            ("回访客户", format_kpi_value(latest.returning_customers), "此前有购买记录"),
+            (
+                "回访客户",
+                format_kpi_value(latest.returning_customers),
+                "此前有购买记录",
+            ),
             (
                 "环比",
                 format_kpi_value(latest.item_revenue_mom_pct, suffix="%", decimals=3),
@@ -33,9 +51,20 @@ else:
             ),
         ]
     )
-    st.plotly_chart(
-        line_chart(frame, x="month_start", y="item_revenue", title="月度商品金额"),
-        use_container_width=True,
-    )
-    st.caption("默认排除不完整月份；州和品类筛选不适用于当前全局月度集市。")
-    st.info("观察增长是否由新客户、回访客户，或客单价变化共同驱动。")
+    left, right = st.columns((2, 1))
+    with left, st.container(border=True):
+        st.plotly_chart(
+            line_chart(
+                frame,
+                x="month_start",
+                y="item_revenue",
+                title="月度商品金额",
+            ),
+            use_container_width=True,
+        )
+        st.caption("默认排除不完整月份；州和品类筛选不适用于当前全局月度集市。")
+    with right:
+        render_insight(
+            "增长解读",
+            "观察增长是否由新客户、回访客户，或客单价变化共同驱动。",
+        )

@@ -5,6 +5,12 @@ import streamlit as st
 
 from app.components.filters import DashboardFilters, render_filters
 from app.components.kpis import format_kpi_value, render_kpis
+from app.components.layout import (
+    apply_dashboard_theme,
+    render_insight,
+    render_page_header,
+)
+from app.components.presentation import display_dataframe
 from src.analytics.repository import AnalyticsRepository
 from src.config import get_settings
 from src.database import get_engine
@@ -24,8 +30,12 @@ def load_state_performance(filters: DashboardFilters) -> pd.DataFrame:
 
 def main() -> None:
     st.set_page_config(page_title="Olist 增长分析", page_icon="📈", layout="wide")
-    st.title("Olist 电商增长、留存与复购分析")
-    st.caption("所有州均指客户收货地址州；默认排除不完整月份。")
+    apply_dashboard_theme()
+    render_page_header(
+        "Olist 电商增长、留存与复购分析",
+        "从市场表现进入增长、留存、客户价值与履约诊断。",
+        "所有州均指客户收货地址州；默认排除不完整月份。",
+    )
 
     filters = render_filters(get_repository())
     state_performance = load_state_performance(filters)
@@ -50,9 +60,19 @@ def main() -> None:
             ),
         ]
     )
-    st.subheader("客户所在州表现")
-    st.dataframe(state_performance, use_container_width=True, hide_index=True)
-    st.info("更多经营、增长、留存、客户与履约页面将在侧边栏逐步开放。")
+    left, right = st.columns((2, 1))
+    with left, st.container(border=True):
+        st.subheader("客户所在州表现")
+        st.dataframe(
+            display_dataframe(state_performance),
+            use_container_width=True,
+            hide_index=True,
+        )
+    with right:
+        render_insight(
+            "分析导航",
+            "更多经营、增长、留存、客户与履约页面将在侧边栏逐步开放。",
+        )
 
 
 if __name__ == "__main__":
