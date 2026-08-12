@@ -4,6 +4,8 @@ from collections.abc import Sequence
 
 import streamlit as st
 
+from app.components.layout import render_kpi_card
+
 
 def format_kpi_value(
     value: float | None,
@@ -21,4 +23,5 @@ def render_kpis(items: Sequence[tuple[str, float | int | None, str]]) -> None:
     """Render label, formatted value, and optional supporting text for KPIs."""
     columns = st.columns(len(items))
     for column, (label, value, help_text) in zip(columns, items, strict=True):
-        column.metric(label, value, help=help_text)
+        with column:
+            render_kpi_card(label, format_kpi_value(value), help_text)

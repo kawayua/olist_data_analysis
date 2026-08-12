@@ -34,10 +34,13 @@ def render_filters(repository: AnalyticsRepository) -> DashboardFilters:
 
     with st.sidebar:
         st.header("筛选条件")
+        st.subheader("时间范围")
         start_month = st.text_input("开始月份", placeholder="2017-01-01") or None
         end_month = st.text_input("结束月份", placeholder="2018-08-01") or None
+        st.subheader("分析维度")
         selected_state = st.selectbox("客户所在州", ["全部", *states])
         product_category = st.text_input("商品品类", placeholder="例如 health_beauty") or None
+        st.subheader("数据口径")
         include_incomplete_months = st.checkbox("包含不完整月份", value=False)
 
     return DashboardFilters(
