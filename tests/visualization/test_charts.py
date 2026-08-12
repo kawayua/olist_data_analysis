@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from src.visualization.charts import (
     line_chart,
@@ -14,6 +15,21 @@ def test_line_chart_uses_requested_columns():
 
     assert figure.data[0].x[0] == "2024-01"
     assert figure.data[0].y[0] == 100.0
+
+
+@pytest.mark.parametrize(
+    ("factory", "kwargs"),
+    [
+        (line_chart, {}),
+        (ranked_bar_chart, {"color": None}),
+    ],
+)
+def test_chart_factories_localize_english_revenue_title(factory, kwargs):
+    frame = pd.DataFrame({"month": ["2024-01"], "revenue": [100.0]})
+
+    figure = factory(frame, x="month", y="revenue", title="Revenue", **kwargs)
+
+    assert figure.layout.title.text == "收入"
 
 
 def test_line_chart_uses_chinese_axis_and_hover_labels():

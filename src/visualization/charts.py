@@ -6,6 +6,19 @@ from plotly.graph_objects import Figure
 
 from app.components.presentation import display_label
 
+CHINESE_TITLES = {
+    "Revenue": "收入",
+}
+
+
+def localized_chart_title(title: str) -> str:
+    """Return a Chinese title so chart factories never expose English text."""
+    if title in CHINESE_TITLES:
+        return CHINESE_TITLES[title]
+    if any("a" <= character.lower() <= "z" for character in title):
+        return "数据分析"
+    return title
+
 
 def apply_chart_layout(figure: Figure, x: str, y: str) -> Figure:
     """Apply the dashboard's shared labels, hover format, and visual style."""
@@ -33,7 +46,7 @@ def line_chart(frame: pd.DataFrame, x: str, y: str, title: str) -> Figure:
         frame,
         x=x,
         y=y,
-        title=title,
+        title=localized_chart_title(title),
         labels={name: display_label(name) for name in frame.columns},
     )
     return apply_chart_layout(figure, x, y)
@@ -51,7 +64,7 @@ def ranked_bar_chart(
         color=color,
         text=y,
         labels={name: display_label(name) for name in ordered.columns},
-        title=title,
+        title=localized_chart_title(title),
     )
     return apply_chart_layout(figure, x, y)
 
