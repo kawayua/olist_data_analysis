@@ -37,3 +37,37 @@ def test_monthly_growth_has_complete_month_flag_and_unique_months():
 
     assert rows == months
     assert incomplete_months == 2
+
+
+def test_monthly_growth_has_growth_driver_metrics():
+    project_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "scripts/build_marts.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        columns = set(
+            connection.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'marts'
+                      AND table_name = 'monthly_growth'
+                    """
+                )
+            ).scalars()
+        )
+
+    assert {
+        "active_customers_mom_pct",
+        "order_count_mom_pct",
+        "item_revenue_aov_mom_pct",
+        "average_review_score",
+    } <= columns
