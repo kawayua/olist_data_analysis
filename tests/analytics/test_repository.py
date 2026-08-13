@@ -87,7 +87,9 @@ def test_repository_exposes_customer_value_and_repurchase_marts(monkeypatch):
     repository.customer_value_analysis()
     repository.repurchase_behavior()
     repository.repurchase_intervals()
+    repository.delivery_rating_analysis()
 
     assert "marts.customer_value_analysis" in queries[0]
     assert "marts.repurchase_behavior" in queries[1]
     assert "marts.repurchase_intervals" in queries[2]
+    assert "marts.delivery_rating_analysis" in queries[3]

@@ -7,12 +7,19 @@ WITH delivered_orders AS (
         orders.item_revenue,
         orders.payment_value,
         orders.is_delivery_late,
+        orders.delivered_at,
+        orders.estimated_delivery_at,
         customers.customer_state
     FROM warehouse.fact_orders AS orders
     JOIN raw.customers AS customers
         ON orders.source_customer_id = customers.customer_id
     WHERE orders.order_status = 'delivered'
       AND customers.customer_state IS NOT NULL
+),
+order_reviews AS (
+    SELECT order_id, AVG(review_score) AS average_review_score
+    FROM warehouse.fact_reviews
+    GROUP BY order_id
 ),
 first_delivered_orders AS (
     SELECT DISTINCT ON (customer_key)
@@ -31,6 +38,11 @@ SELECT
         AS item_revenue_aov,
     ROUND(AVG(orders.is_delivery_late::integer) * 100, 3)
         AS delayed_delivery_rate_pct,
+    ROUND(
+        AVG(EXTRACT(EPOCH FROM (orders.delivered_at - orders.purchased_at)) / 86400.0),
+        3
+    ) AS average_delivery_days,
+    ROUND(AVG(reviews.average_review_score), 3) AS average_review_score,
     COUNT(DISTINCT orders.customer_key) FILTER (
         WHERE first_orders.order_id = orders.order_id
           AND customer_360.eligible_for_90d
@@ -56,6 +68,8 @@ SELECT
         3
     ) AS repurchase_rate_90d_pct
 FROM delivered_orders AS orders
+LEFT JOIN order_reviews AS reviews
+    ON orders.order_id = reviews.order_id
 JOIN first_delivered_orders AS first_orders
     ON orders.customer_key = first_orders.customer_key
 JOIN marts.customer_360 AS customer_360

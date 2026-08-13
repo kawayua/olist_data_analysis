@@ -90,3 +90,24 @@ def retention_heatmap(matrix: pd.DataFrame) -> Figure:
     figure.update_yaxes(gridcolor="#E5E7EB")
     figure.update_traces(hovertemplate="留存率（%）=%{z:.1f}<extra></extra>")
     return figure
+
+
+def bubble_scatter_chart(
+    frame: pd.DataFrame,
+    x: str,
+    y: str,
+    size: str,
+    title: str,
+    color: str | None = None,
+) -> Figure:
+    """Return a scatter plot whose marker area encodes the requested measure."""
+    figure = px.scatter(
+        frame,
+        x=x,
+        y=y,
+        size=size,
+        color=color,
+        title=localized_chart_title(title),
+        labels={name: display_label(name) for name in frame.columns},
+    )
+    return apply_chart_layout(figure, x, y)

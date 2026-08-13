@@ -5,6 +5,7 @@ from src.visualization.charts import (
     line_chart,
     ranked_bar_chart,
     retention_heatmap,
+    bubble_scatter_chart,
 )
 
 
@@ -73,3 +74,9 @@ def test_retention_heatmap_uses_chinese_cohort_labels():
     assert figure.layout.xaxis.title.text == "距首购月数"
     assert figure.layout.yaxis.title.text == "Cohort 首购月份"
     assert figure.layout.coloraxis.colorbar.title.text == "留存率（%）"
+
+
+def test_bubble_scatter_encodes_orders_as_marker_size():
+    frame = pd.DataFrame({"item_revenue_mom_pct": [10.0], "item_revenue": [100.0], "order_count": [5]})
+    figure = bubble_scatter_chart(frame, "item_revenue_mom_pct", "item_revenue", "order_count", "增长机会矩阵")
+    assert figure.data[0].marker.size[0] == 5

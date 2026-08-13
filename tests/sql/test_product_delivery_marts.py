@@ -164,3 +164,40 @@ def test_state_performance_has_one_row_per_customer_state_and_valid_rates():
     assert rows > 0
     assert duplicates == 0
     assert invalid_rates == 0
+
+
+def test_state_performance_exposes_delivery_and_review_metrics():
+    project_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "scripts/build_marts.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        invalid_states, invalid_buckets = connection.execute(
+            text(
+                """
+                SELECT
+                    (
+                        SELECT COUNT(*)
+                        FROM marts.state_performance
+                        WHERE average_delivery_days < 0
+                           OR average_review_score NOT BETWEEN 1 AND 5
+                    ),
+                    (
+                        SELECT COUNT(*)
+                        FROM marts.delivery_rating_analysis
+                        WHERE average_review_score NOT BETWEEN 1 AND 5
+                           OR order_count <= 0
+                    )
+                """
+            )
+        ).one()
+
+    assert invalid_states == 0
+    assert invalid_buckets == 0

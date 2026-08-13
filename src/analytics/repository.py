@@ -88,6 +88,15 @@ class AnalyticsRepository:
             "marts.repurchase_intervals", [], {}, "interval_bucket"
         )
 
+    def delivery_rating_analysis(self) -> pd.DataFrame:
+        """Return delivery delay buckets and their average review scores."""
+        return self._read_mart(
+            "marts.delivery_rating_analysis",
+            [],
+            {},
+            "average_delivery_vs_estimate_days",
+        )
+
     def available_customer_states(self) -> pd.DataFrame:
         """Return customer receiving states available to the Dashboard filter."""
         return self._read_mart("marts.state_performance", [], {}, "customer_state")
