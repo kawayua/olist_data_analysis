@@ -67,6 +67,27 @@ class AnalyticsRepository:
     def delivery_experience(self, filters: AnalyticsFilters) -> pd.DataFrame:
         return self._read_mart("marts.delivery_experience", [], {}, "delivery_status")
 
+    def customer_value_analysis(self) -> pd.DataFrame:
+        """Return customer-value measures at RFM-segment grain."""
+        return self._read_mart(
+            "marts.customer_value_analysis", [], {}, "item_revenue DESC"
+        )
+
+    def repurchase_behavior(self) -> pd.DataFrame:
+        """Return first-purchase-category repeat rates by eligible horizon."""
+        return self._read_mart(
+            "marts.repurchase_behavior",
+            [],
+            {},
+            "first_purchase_category, horizon_days",
+        )
+
+    def repurchase_intervals(self) -> pd.DataFrame:
+        """Return customer counts in mutually exclusive next-purchase buckets."""
+        return self._read_mart(
+            "marts.repurchase_intervals", [], {}, "interval_bucket"
+        )
+
     def available_customer_states(self) -> pd.DataFrame:
         """Return customer receiving states available to the Dashboard filter."""
         return self._read_mart("marts.state_performance", [], {}, "customer_state")

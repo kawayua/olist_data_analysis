@@ -14,6 +14,9 @@ def main() -> None:
 
     engine = get_engine(get_settings())
     run_sql(engine, "DROP TABLE IF EXISTS marts.customer_segment_strategy")
+    run_sql(engine, "DROP TABLE IF EXISTS marts.repurchase_intervals")
+    run_sql(engine, "DROP TABLE IF EXISTS marts.repurchase_behavior")
+    run_sql(engine, "DROP TABLE IF EXISTS marts.customer_value_analysis")
     run_sql(engine, "DROP TABLE IF EXISTS marts.customer_360")
     run_sql(engine, "DROP TABLE IF EXISTS marts.state_performance")
     run_sql(engine, "DROP TABLE IF EXISTS marts.delivery_order_analysis")
@@ -32,6 +35,8 @@ def main() -> None:
         "034_delivery_experience.sql",
         "035_delivery_order_analysis.sql",
         "036_state_performance.sql",
+        "037_customer_value_analysis.sql",
+        "038_repurchase_behavior.sql",
     ):
         path = PROJECT_ROOT / "sql" / "marts" / filename
         run_sql_file(engine, path)

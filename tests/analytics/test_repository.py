@@ -72,3 +72,22 @@ def test_state_repository_uses_a_bound_customer_state_parameter(monkeypatch):
     assert "marts.state_performance" in queries[1][0]
     assert "SP" not in queries[1][0]
     assert queries[1][1] == {"customer_state": "SP"}
+
+
+def test_repository_exposes_customer_value_and_repurchase_marts(monkeypatch):
+    queries = []
+
+    def fake_read_sql(query, engine, params):
+        queries.append(str(query))
+        return pd.DataFrame()
+
+    monkeypatch.setattr("src.analytics.repository.pd.read_sql", fake_read_sql)
+    repository = AnalyticsRepository(engine=object())
+
+    repository.customer_value_analysis()
+    repository.repurchase_behavior()
+    repository.repurchase_intervals()
+
+    assert "marts.customer_value_analysis" in queries[0]
+    assert "marts.repurchase_behavior" in queries[1]
+    assert "marts.repurchase_intervals" in queries[2]
