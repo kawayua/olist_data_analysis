@@ -106,6 +106,8 @@ def display_dataframe(frame: pd.DataFrame) -> pd.DataFrame:
     displayed = frame.copy(deep=True)
     for column in set(displayed.columns).intersection(CATEGORY_DISPLAY_VALUES):
         displayed[column] = displayed[column].map(
-            lambda value: display_value(column, value)
+            lambda value, display_column=column: display_value(
+                display_column, value
+            )
         )
     return displayed.rename(columns=CHINESE_COLUMNS)

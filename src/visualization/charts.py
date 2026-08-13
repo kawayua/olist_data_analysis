@@ -4,11 +4,47 @@ import pandas as pd
 import plotly.express as px
 from plotly.graph_objects import Figure
 
-from app.components.presentation import display_label
+from app.components.presentation import display_label, display_value
 
 CHINESE_TITLES = {
     "Revenue": "收入",
 }
+
+CURRENCY_COLUMNS = {
+    "item_revenue",
+    "payment_value",
+    "item_revenue_aov",
+    "new_customer_item_revenue",
+    "returning_customer_item_revenue",
+    "freight_revenue",
+    "average_monetary_item_revenue",
+    "first_purchase_item_revenue",
+    "repeat_customer_item_revenue",
+}
+
+
+def localized_chart_frame(frame: pd.DataFrame, color: str | None) -> pd.DataFrame:
+    """Return a chart-only copy with localized categorical values."""
+    if color is None or color not in frame.columns:
+        return frame
+    localized = frame.copy(deep=True)
+    localized[color] = localized[color].map(
+        lambda value: display_value(color, value)
+    )
+    return localized
+
+
+def hover_value_template(column: str, coordinate: str) -> str:
+    """Format a Plotly coordinate using the business unit of a metric."""
+    if column in CURRENCY_COLUMNS:
+        return f"R$%{{{coordinate}:,.2f}}"
+    if column.endswith("_pct"):
+        return f"%{{{coordinate}:.3f}}%"
+    if column == "average_review_score":
+        return f"%{{{coordinate}:.3f}}分"
+    if column.endswith("_days"):
+        return f"%{{{coordinate}:.3f}}天"
+    return f"%{{{coordinate}}}"
 
 
 def localized_chart_title(title: str) -> str:
@@ -34,7 +70,8 @@ def apply_chart_layout(figure: Figure, x: str, y: str) -> Figure:
     figure.update_yaxes(title=y_label, gridcolor="#E5E7EB")
     figure.update_traces(
         hovertemplate=(
-            f"{x_label}=%{{x}}<br>{y_label}=R$%{{y:,.0f}}<extra></extra>"
+            f"{x_label}={hover_value_template(x, 'x')}<br>"
+            f"{y_label}={hover_value_template(y, 'y')}<extra></extra>"
         )
     )
     return figure
@@ -75,7 +112,7 @@ def retention_heatmap(matrix: pd.DataFrame) -> Figure:
         matrix,
         labels={
             "x": "距首购月数",
-            "y": "Cohort 首购月份",
+            "y": "首购月份（同期群）",
             "color": "留存率（%）",
         },
         color_continuous_scale="Blues",
@@ -88,7 +125,7 @@ def retention_heatmap(matrix: pd.DataFrame) -> Figure:
     )
     figure.update_xaxes(gridcolor="#E5E7EB")
     figure.update_yaxes(gridcolor="#E5E7EB")
-    figure.update_traces(hovertemplate="留存率（%）=%{z:.1f}<extra></extra>")
+    figure.update_traces(hovertemplate="留存率（%）=%{z:.1f}%<extra></extra>")
     return figure
 
 
@@ -101,13 +138,14 @@ def bubble_scatter_chart(
     color: str | None = None,
 ) -> Figure:
     """Return a scatter plot whose marker area encodes the requested measure."""
+    chart_frame = localized_chart_frame(frame, color)
     figure = px.scatter(
-        frame,
+        chart_frame,
         x=x,
         y=y,
         size=size,
         color=color,
         title=localized_chart_title(title),
-        labels={name: display_label(name) for name in frame.columns},
+        labels={name: display_label(name) for name in chart_frame.columns},
     )
     return apply_chart_layout(figure, x, y)
