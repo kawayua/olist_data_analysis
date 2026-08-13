@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_filters
+from app.components.filters import DashboardFilters, render_cohort_filter
 from app.components.kpis import format_kpi_value, render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
@@ -26,7 +26,7 @@ render_page_header(
     "用 Cohort 矩阵识别首购客户在后续月份的留存变化。",
     "仅展示拥有完整观察期的 Cohort 数据。",
 )
-filters = render_filters(get_repository())
+filters = render_cohort_filter()
 frame = load_cohort_retention(filters)
 if frame.empty:
     st.info("当前 Cohort 筛选没有完整观察月份。请清除条件或包含不完整月份。")

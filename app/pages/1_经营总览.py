@@ -3,13 +3,14 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_filters
+from app.components.filters import DashboardFilters, render_state_filter
 from app.components.kpis import format_kpi_value, render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
     render_insight,
     render_page_header,
 )
+from app.components.presentation import summarize_state_performance
 from app.Home import get_repository
 from src.visualization.charts import ranked_bar_chart
 
@@ -25,12 +26,12 @@ render_page_header(
     "按客户收货地址州比较经营规模与履约风险。",
     "州筛选真实作用于本页；默认排除不完整月份。",
 )
-filters = render_filters(get_repository())
+filters = render_state_filter(get_repository())
 frame = load_state_performance(filters)
 if frame.empty:
     st.info("当前筛选没有州表现数据。请清除客户所在州后重试。")
 else:
-    totals = frame.iloc[0] if filters.customer_state else frame.sum(numeric_only=True)
+    totals = frame.iloc[0] if filters.customer_state else summarize_state_performance(frame)
     render_kpis(
         [
             (

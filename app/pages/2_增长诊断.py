@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_filters
+from app.components.filters import DashboardFilters, render_month_filter
 from app.components.kpis import format_kpi_value, render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
@@ -25,7 +25,7 @@ render_page_header(
     "观察月度商品金额、新客和回访客户的变化。",
     "默认排除不完整月份；州和品类筛选不适用于全局月度趋势。",
 )
-filters = render_filters(get_repository())
+filters = render_month_filter()
 frame = load_monthly_growth(filters)
 if frame.empty:
     st.info("当前日期范围没有完整月份数据。请扩大日期范围或包含不完整月份。")

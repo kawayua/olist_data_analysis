@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_filters
+from app.components.filters import DashboardFilters, render_category_filter
 from app.components.kpis import format_kpi_value, render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
@@ -31,7 +31,7 @@ render_page_header(
     "结合商品品类表现与履约体验，识别收入和服务质量的关联。",
     "品类筛选作用于商品表现；履约汇总保持全局口径。",
 )
-filters = render_filters(get_repository())
+filters = render_category_filter()
 products = load_product_performance(filters)
 delivery = load_delivery_experience(filters)
 if products.empty or delivery.empty:

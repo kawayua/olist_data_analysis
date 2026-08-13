@@ -1,8 +1,13 @@
 import pandas as pd
+import pytest
 
 from app.components.filters import DashboardFilters
 from app.components.kpis import format_kpi_value, render_kpis
-from app.components.presentation import display_dataframe, display_label
+from app.components.presentation import (
+    display_dataframe,
+    display_label,
+    summarize_state_performance,
+)
 
 
 def test_dashboard_filters_convert_to_repository_filters():
@@ -90,3 +95,21 @@ def test_display_dataframe_localizes_state_and_delivery_metrics_without_mutation
 
 def test_display_label_keeps_unknown_column_name():
     assert display_label("unmapped_metric") == "unmapped_metric"
+
+
+def test_state_summary_weights_rates_by_their_denominators():
+    frame = pd.DataFrame(
+        {
+            "order_count": [100, 1],
+            "customer_count": [90, 1],
+            "item_revenue": [1_000.0, 50.0],
+            "delayed_delivery_rate_pct": [10.0, 100.0],
+            "eligible_first_purchase_customers": [100, 1],
+            "repurchased_first_purchase_customers": [20, 1],
+        }
+    )
+
+    summary = summarize_state_performance(frame)
+
+    assert summary.delayed_delivery_rate_pct == pytest.approx(10.891, abs=0.001)
+    assert summary.repurchase_rate_90d_pct == pytest.approx(20.792, abs=0.001)

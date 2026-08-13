@@ -27,6 +27,27 @@ CHINESE_COLUMNS = {
 }
 
 
+def summarize_state_performance(frame: pd.DataFrame) -> pd.Series:
+    """Aggregate state rows while preserving the denominators of rate metrics."""
+    summary = frame.sum(numeric_only=True)
+    order_count = summary.get("order_count", 0)
+    eligible_customers = summary.get("eligible_first_purchase_customers", 0)
+    delayed_orders = (
+        frame["order_count"] * frame["delayed_delivery_rate_pct"] / 100
+    ).sum()
+    summary["delayed_delivery_rate_pct"] = (
+        delayed_orders / order_count * 100 if order_count else None
+    )
+    summary["repurchase_rate_90d_pct"] = (
+        summary.get("repurchased_first_purchase_customers", 0)
+        / eligible_customers
+        * 100
+        if eligible_customers
+        else None
+    )
+    return summary
+
+
 def display_label(column: str) -> str:
     """Return the Chinese label for a known analytical column."""
     return CHINESE_COLUMNS.get(column, column)

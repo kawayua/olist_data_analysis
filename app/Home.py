@@ -3,14 +3,14 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_filters
+from app.components.filters import DashboardFilters
 from app.components.kpis import format_kpi_value, render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
     render_insight,
     render_page_header,
 )
-from app.components.presentation import display_dataframe
+from app.components.presentation import display_dataframe, summarize_state_performance
 from src.analytics.repository import AnalyticsRepository
 from src.config import get_settings
 from src.database import get_engine
@@ -37,13 +37,12 @@ def main() -> None:
         "所有州均指客户收货地址州；默认排除不完整月份。",
     )
 
-    filters = render_filters(get_repository())
-    state_performance = load_state_performance(filters)
+    state_performance = load_state_performance(DashboardFilters())
     if state_performance.empty:
-        st.info("当前筛选没有匹配数据。请清除州或品类条件后重试。")
+        st.info("当前没有可展示的州表现数据。请重建分析集市后重试。")
         return
 
-    row = state_performance.iloc[0]
+    row = summarize_state_performance(state_performance)
     render_kpis(
         [
             ("商品金额", format_kpi_value(row.item_revenue, prefix="R$"), "已送达订单"),

@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_filters
+from app.components.filters import DashboardFilters
 from app.components.kpis import format_kpi_value, render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
@@ -25,8 +25,7 @@ render_page_header(
     "比较 RFM 客户分群的商品金额与贡献占比。",
     "客户分群来自统一 RFM 规则，不代表个体复购预测。",
 )
-filters = render_filters(get_repository())
-frame = load_customer_segments(filters)
+frame = load_customer_segments(DashboardFilters())
 if frame.empty:
     st.info("当前没有客户分群数据。请重建集市后重试。")
 else:
