@@ -74,6 +74,24 @@ def test_ranked_bar_chart_sorts_revenue_and_localizes_category_axis():
     assert figure.layout.xaxis.title.text == "商品品类"
 
 
+def test_ranked_bar_chart_translates_first_purchase_category_axis_values():
+    frame = pd.DataFrame(
+        {
+            "first_purchase_category": ["bed_bath_table"],
+            "repurchase_rate_pct": [10.0],
+        }
+    )
+
+    figure = ranked_bar_chart(
+        frame,
+        "first_purchase_category",
+        "repurchase_rate_pct",
+        "首购复购率",
+    )
+
+    assert figure.data[0].x[0] == "床品、卫浴与餐桌"
+
+
 def test_retention_heatmap_uses_chinese_cohort_labels():
     matrix = pd.DataFrame(
         [[100.0, 50.0]], index=["2024-01"], columns=[0, 1]
@@ -117,3 +135,25 @@ def test_bubble_chart_uses_chinese_axis_legend_and_hover_labels():
     assert figure.data[0].name == "高价值客户"
     assert "平均购买次数" in figure.data[0].hovertemplate
     assert "average_frequency_orders" not in figure.data[0].hovertemplate
+
+
+def test_bubble_chart_translates_product_category_legend_values():
+    frame = pd.DataFrame(
+        {
+            "order_count": [5],
+            "item_revenue": [100.0],
+            "average_review_score": [4.0],
+            "product_category": ["toys"],
+        }
+    )
+
+    figure = bubble_scatter_chart(
+        frame,
+        "order_count",
+        "item_revenue",
+        "average_review_score",
+        "品类表现",
+        color="product_category",
+    )
+
+    assert figure.data[0].name == "玩具"

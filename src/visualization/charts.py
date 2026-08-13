@@ -23,14 +23,24 @@ CURRENCY_COLUMNS = {
 }
 
 
-def localized_chart_frame(frame: pd.DataFrame, color: str | None) -> pd.DataFrame:
+def localized_chart_frame(
+    frame: pd.DataFrame, *categorical_columns: str | None
+) -> pd.DataFrame:
     """Return a chart-only copy with localized categorical values."""
-    if color is None or color not in frame.columns:
+    columns = [
+        column
+        for column in categorical_columns
+        if column is not None and column in frame.columns
+    ]
+    if not columns:
         return frame
     localized = frame.copy(deep=True)
-    localized[color] = localized[color].map(
-        lambda value: display_value(color, value)
-    )
+    for column in columns:
+        localized[column] = localized[column].map(
+            lambda value, display_column=column: display_value(
+                display_column, value
+            )
+        )
     return localized
 
 
@@ -93,7 +103,8 @@ def ranked_bar_chart(
     frame: pd.DataFrame, x: str, y: str, title: str, color: str | None = None
 ) -> Figure:
     """Return a descending ranked bar chart with dashboard styling."""
-    ordered = frame.sort_values(y, ascending=False)
+    chart_frame = localized_chart_frame(frame, x, color)
+    ordered = chart_frame.sort_values(y, ascending=False)
     figure = px.bar(
         ordered,
         x=x,

@@ -117,6 +117,14 @@ def test_display_dataframe_translates_columns_and_segment_values():
     ]
 
 
+def test_display_dataframe_translates_product_category_values():
+    displayed = display_dataframe(
+        pd.DataFrame({"product_category": ["health_beauty"]})
+    )
+
+    assert displayed.iloc[0, 0] == "美妆与健康"
+
+
 def test_display_label_keeps_unknown_column_name():
     assert display_label("unmapped_metric") == "unmapped_metric"
 
