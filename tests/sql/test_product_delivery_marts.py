@@ -201,3 +201,29 @@ def test_state_performance_exposes_delivery_and_review_metrics():
 
     assert invalid_states == 0
     assert invalid_buckets == 0
+
+
+def test_product_performance_exposes_average_review_score():
+    project_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "scripts/build_marts.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        invalid = connection.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM marts.product_performance
+                WHERE average_review_score NOT BETWEEN 1 AND 5
+                """
+            )
+        ).scalar_one()
+
+    assert invalid == 0

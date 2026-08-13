@@ -9,7 +9,11 @@ WITH segment_totals AS (
         AVG(monetary_item_revenue) AS average_monetary_item_revenue,
         COUNT(*) FILTER (WHERE frequency_orders = 1) AS first_purchase_customers,
         COUNT(*) FILTER (WHERE frequency_orders = 2) AS second_purchase_customers,
-        COUNT(*) FILTER (WHERE frequency_orders >= 3) AS multi_purchase_customers
+        COUNT(*) FILTER (WHERE frequency_orders >= 3) AS multi_purchase_customers,
+        SUM(monetary_item_revenue) FILTER (WHERE frequency_orders = 1)
+            AS first_purchase_item_revenue,
+        SUM(monetary_item_revenue) FILTER (WHERE frequency_orders >= 2)
+            AS repeat_customer_item_revenue
     FROM marts.customer_360
     GROUP BY customer_segment
 ),
@@ -33,7 +37,11 @@ SELECT
         AS average_monetary_item_revenue,
     totals.first_purchase_customers,
     totals.second_purchase_customers,
-    totals.multi_purchase_customers
+    totals.multi_purchase_customers,
+    COALESCE(totals.first_purchase_item_revenue, 0::numeric)
+        AS first_purchase_item_revenue,
+    COALESCE(totals.repeat_customer_item_revenue, 0::numeric)
+        AS repeat_customer_item_revenue
 FROM segment_totals AS totals
 CROSS JOIN overall;
 

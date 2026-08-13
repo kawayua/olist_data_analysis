@@ -76,7 +76,7 @@ def test_display_dataframe_localizes_state_and_delivery_metrics_without_mutation
         "90天复购率（%）",
         "平均配送天数",
         "配送天数中位数",
-        "平均配送较预计天数",
+        "相对预计送达天数",
     ]
     assert list(source.columns) == [
         "payment_value",

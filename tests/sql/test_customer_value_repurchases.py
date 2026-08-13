@@ -39,6 +39,26 @@ def test_customer_value_analysis_has_one_row_per_segment():
     assert duplicates == 0
 
 
+def test_customer_value_analysis_separates_purchase_stage_revenue():
+    _rebuild_marts()
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        columns = set(
+            connection.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'marts'
+                      AND table_name = 'customer_value_analysis'
+                    """
+                )
+            ).scalars()
+        )
+
+    assert {"first_purchase_item_revenue", "repeat_customer_item_revenue"} <= columns
+
+
 def test_repurchase_behavior_has_exact_horizons_and_interval_buckets():
     _rebuild_marts()
     engine = get_engine(get_settings())

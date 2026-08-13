@@ -37,6 +37,11 @@ customer_first_orders AS (
     FROM warehouse.fact_orders
     WHERE order_status = 'delivered'
     ORDER BY customer_key, purchased_at, order_id
+),
+order_reviews AS (
+    SELECT order_id, AVG(review_score) AS average_review_score
+    FROM warehouse.fact_reviews
+    GROUP BY order_id
 )
 SELECT
     categories.product_category,
@@ -50,6 +55,7 @@ SELECT
         3
     ) AS freight_rate_pct,
     ROUND(AVG(orders.is_delivery_late::integer) * 100, 3) AS delayed_delivery_rate_pct,
+    ROUND(AVG(reviews.average_review_score), 3) AS average_review_score,
     COUNT(DISTINCT orders.customer_key) FILTER (
         WHERE first_orders.order_id = orders.order_id
           AND customer_360.eligible_for_90d
@@ -81,6 +87,8 @@ JOIN customer_first_orders AS first_orders
     ON orders.customer_key = first_orders.customer_key
 JOIN marts.customer_360 AS customer_360
     ON orders.customer_key = customer_360.customer_key
+LEFT JOIN order_reviews AS reviews
+    ON orders.order_id = reviews.order_id
 GROUP BY categories.product_category;
 
 ALTER TABLE marts.product_performance

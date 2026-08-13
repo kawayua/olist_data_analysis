@@ -11,7 +11,7 @@ from app.components.layout import (
     render_page_header,
 )
 from app.Home import get_repository
-from src.visualization.charts import line_chart
+from src.visualization.charts import bubble_scatter_chart, line_chart, ranked_bar_chart
 
 
 @st.cache_data
@@ -22,8 +22,8 @@ def load_monthly_growth(filters: DashboardFilters) -> pd.DataFrame:
 apply_dashboard_theme()
 render_page_header(
     "增长诊断",
-    "观察月度商品金额、新客和回访客户的变化。",
-    "默认排除不完整月份；州和品类筛选不适用于全局月度趋势。",
+    "拆解商品金额变化中的购买用户、购买频次、客单价与新老客贡献。",
+    "筛选仅影响全局月度增长集市，默认排除不完整月份。",
 )
 filters = render_month_filter()
 frame = load_monthly_growth(filters)
@@ -38,33 +38,38 @@ else:
                 format_kpi_value(latest.item_revenue, prefix="R$"),
                 "完整月份",
             ),
-            ("新客户", format_kpi_value(latest.new_customers), "首次购买客户"),
+            ("购买用户环比", format_kpi_value(latest.active_customers_mom_pct, suffix="%", decimals=3), "最新完整月份"),
             (
-                "回访客户",
-                format_kpi_value(latest.returning_customers),
-                "此前有购买记录",
+                "订单环比",
+                format_kpi_value(latest.order_count_mom_pct, suffix="%", decimals=3),
+                "最新完整月份",
             ),
             (
-                "环比",
-                format_kpi_value(latest.item_revenue_mom_pct, suffix="%", decimals=3),
-                "商品金额环比",
+                "客单价环比",
+                format_kpi_value(latest.item_revenue_aov_mom_pct, suffix="%", decimals=3),
+                "最新完整月份",
             ),
         ]
     )
-    left, right = st.columns((2, 1))
+    for metric, title in [
+        ("item_revenue", "商品金额趋势"),
+        ("active_customers", "购买用户趋势"),
+        ("item_revenue_aov", "商品金额客单价趋势"),
+    ]:
+        with st.container(border=True):
+            st.plotly_chart(line_chart(frame, "month_start", metric, title), use_container_width=True)
+    left, right = st.columns(2)
     with left, st.container(border=True):
         st.plotly_chart(
-            line_chart(
-                frame,
-                x="month_start",
-                y="item_revenue",
-                title="月度商品金额",
-            ),
+            bubble_scatter_chart(frame.dropna(subset=["item_revenue_mom_pct"]), "item_revenue_mom_pct", "item_revenue", "order_count", "月度增长机会矩阵"),
             use_container_width=True,
         )
-        st.caption("默认排除不完整月份；州和品类筛选不适用于当前全局月度集市。")
-    with right:
+        st.caption("横轴为商品金额环比，纵轴为商品金额，气泡面积为订单数。")
+    with right, st.container(border=True):
+        st.plotly_chart(ranked_bar_chart(frame, "month_start", "new_customer_item_revenue", "新客商品金额"), use_container_width=True)
+        st.plotly_chart(ranked_bar_chart(frame, "month_start", "returning_customer_item_revenue", "老客商品金额"), use_container_width=True)
+    with st.container(border=True):
         render_insight(
             "增长解读",
-            "观察增长是否由新客户、回访客户，或客单价变化共同驱动。",
+            "GMV = 购买用户 × 购买频次 × 客单价。这里用三条可观测趋势展示驱动，不将它们相加伪装成精确归因瀑布图。",
         )

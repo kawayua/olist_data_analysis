@@ -2,10 +2,10 @@ import pandas as pd
 import pytest
 
 from src.visualization.charts import (
+    bubble_scatter_chart,
     line_chart,
     ranked_bar_chart,
     retention_heatmap,
-    bubble_scatter_chart,
 )
 
 
