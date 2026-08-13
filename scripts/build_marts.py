@@ -14,6 +14,7 @@ def main() -> None:
 
     engine = get_engine(get_settings())
     run_sql(engine, "DROP TABLE IF EXISTS marts.customer_segment_strategy")
+    run_sql(engine, "DROP TABLE IF EXISTS marts.ml_customer_features")
     run_sql(engine, "DROP TABLE IF EXISTS marts.delivery_rating_analysis")
     run_sql(engine, "DROP TABLE IF EXISTS marts.repurchase_intervals")
     run_sql(engine, "DROP TABLE IF EXISTS marts.repurchase_behavior")
@@ -34,6 +35,7 @@ def main() -> None:
         "032_customer_segment_strategy.sql",
         "033_product_performance.sql",
         "034_delivery_experience.sql",
+        "035_ml_customer_features.sql",
         "035_delivery_order_analysis.sql",
         "036_state_performance.sql",
         "037_customer_value_analysis.sql",

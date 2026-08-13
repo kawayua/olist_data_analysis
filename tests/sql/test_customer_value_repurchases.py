@@ -72,3 +72,29 @@ def test_repurchase_behavior_has_exact_horizons_and_interval_buckets():
 
     assert sorted(horizons) == [30, 60, 90]
     assert set(buckets) == {"0_30", "31_60", "61_90", "91_180", "181_plus"}
+
+
+def test_ml_customer_features_exposes_prediction_audit_columns():
+    _rebuild_marts()
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        columns = set(
+            connection.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'marts'
+                      AND table_name = 'ml_customer_features'
+                    """
+                )
+            ).scalars()
+        )
+
+    assert {
+        "customer_key",
+        "prediction_time",
+        "feature_available_at",
+        "eligible_for_90d",
+        "repurchased_within_90d",
+    } <= columns
