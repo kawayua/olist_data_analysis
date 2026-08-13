@@ -93,6 +93,30 @@ def test_display_dataframe_localizes_state_and_delivery_metrics_without_mutation
     ]
 
 
+def test_display_dataframe_translates_columns_and_segment_values():
+    source = pd.DataFrame(
+        {
+            "customer_segment": ["high_value"],
+            "customer_share_pct": [12.5],
+            "repeat_customer_item_revenue": [100.0],
+        }
+    )
+
+    displayed = display_dataframe(source)
+
+    assert list(displayed.columns) == [
+        "客户分群",
+        "客户占比（%）",
+        "复购客户商品金额",
+    ]
+    assert displayed.iloc[0, 0] == "高价值客户"
+    assert list(source.columns) == [
+        "customer_segment",
+        "customer_share_pct",
+        "repeat_customer_item_revenue",
+    ]
+
+
 def test_display_label_keeps_unknown_column_name():
     assert display_label("unmapped_metric") == "unmapped_metric"
 
