@@ -1,4 +1,4 @@
-"""Baseline and Logistic Regression candidates for repurchase ranking."""
+"""Baseline, logistic regression, random forest, and LightGBM repurchase candidates."""
 
 import json
 from dataclasses import dataclass

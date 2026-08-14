@@ -5,6 +5,7 @@ import json
 import joblib
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.ml.artifacts import write_training_artifacts
 from src.ml.calibration import SigmoidCalibrator
@@ -99,7 +100,7 @@ def test_writer_persists_model_schema_metrics_and_safe_representative_rows(tmp_p
     }
     representative_predictions = pd.DataFrame(
         {
-            "customer_unique_id": ["customer-1", "customer-2"],
+            "customer_key": ["customer-1", "customer-2"],
             "prediction_time": ["2018-01-01", "2018-01-02"],
             **{
                 feature: [float(index + 1), float(index + 2)]
@@ -146,8 +147,13 @@ def test_writer_persists_model_schema_metrics_and_safe_representative_rows(tmp_p
     )
     assert len(rows) == 2
     assert "repurchased_within_90d" not in rows[0]
+    assert rows[0]["customer_key"] == "customer-1"
+    assert all(
+        "customer_key" in row or "customer_unique_id" in row for row in rows
+    )
     assert set(rows[0]).issubset(
         {
+            "customer_key",
             "customer_unique_id",
             "order_id",
             "customer_id",
@@ -159,3 +165,32 @@ def test_writer_persists_model_schema_metrics_and_safe_representative_rows(tmp_p
     )
     model_card = (tmp_path / "model_card.md").read_text(encoding="utf-8")
     assert "特征重要性反映关联而非因果关系" in model_card
+
+
+def test_writer_rejects_representative_rows_without_customer_identifier(tmp_path):
+    """Audit rows without a customer identifier cannot support follow-up review."""
+    selected_result = train_candidates(_small_training_frame())
+    calibrator = SigmoidCalibrator().fit(
+        np.array([0.05, 0.10, 0.80, 0.95]), np.array([0, 0, 1, 1])
+    )
+    representative_predictions = pd.DataFrame(
+        {
+            "prediction_time": ["2018-01-01"],
+            **{
+                feature: [float(index + 1)]
+                for index, feature in enumerate(FEATURE_COLUMNS)
+            },
+            "raw_probability": [0.2],
+            "calibrated_probability": [0.1],
+        }
+    )
+
+    with pytest.raises(ValueError, match="customer identifier"):
+        write_training_artifacts(
+            tmp_path,
+            "logistic_regression",
+            selected_result,
+            calibrator,
+            {},
+            representative_predictions,
+        )

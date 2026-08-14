@@ -27,10 +27,15 @@ FORBIDDEN_FUTURE_FIELDS = [
 ]
 
 _REPRESENTATIVE_ID_TIME_COLUMNS = (
+    "customer_key",
     "customer_unique_id",
     "customer_id",
     "order_id",
     "prediction_time",
+)
+_REPRESENTATIVE_CUSTOMER_IDENTIFIER_COLUMNS = (
+    "customer_key",
+    "customer_unique_id",
 )
 _REPRESENTATIVE_PROBABILITY_COLUMNS = (
     "raw_probability",
@@ -51,6 +56,16 @@ def _representative_columns(frame: pd.DataFrame) -> list[str]:
         *_REPRESENTATIVE_PROBABILITY_COLUMNS,
     )
     return [column for column in allowed if column in frame.columns]
+
+
+def _validate_representative_customer_identifier(frame: pd.DataFrame) -> None:
+    if not any(
+        column in frame.columns
+        for column in _REPRESENTATIVE_CUSTOMER_IDENTIFIER_COLUMNS
+    ):
+        raise ValueError(
+            "representative_predictions must include a customer identifier"
+        )
 
 
 def _model_card(selected_name: str, metrics: dict[str, object]) -> str:
@@ -92,6 +107,7 @@ def write_training_artifacts(
     representative_predictions: pd.DataFrame,
 ) -> None:
     """Persist the selected pipeline and its Chinese-language audit evidence."""
+    _validate_representative_customer_identifier(representative_predictions)
     output_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(
         {
