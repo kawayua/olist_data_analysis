@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config import get_settings
 from src.database import get_engine
 from src.ml.dataset import temporal_split
-from src.ml.evaluate import evaluate_probabilities
+from src.ml.evaluate import evaluate_probabilities, evaluate_ranking
 from src.ml.train import (
     business_baseline_scores,
     train_candidates,
@@ -41,7 +41,7 @@ def main() -> None:
     train, validation, test = temporal_split(frame, train_end, valid_end)
     result = train_candidates(train)
     labels = validation["repurchased_within_90d"].astype(int).to_numpy()
-    baseline_metrics = evaluate_probabilities(
+    baseline_metrics = evaluate_ranking(
         labels, business_baseline_scores(validation)
     )
     logistic_metrics = evaluate_probabilities(

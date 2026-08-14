@@ -14,12 +14,12 @@ class ModelMetrics:
     prevalence: float
     pr_auc: float
     roc_auc: float
-    brier_score: float
+    brier_score: float | None
     precision_at_k: float
     recall_at_k: float
     lift_at_k: float
 
-    def to_dict(self) -> dict[str, float]:
+    def to_dict(self) -> dict[str, float | None]:
         """Return serializable metric names and values."""
         return asdict(self)
 
@@ -46,15 +46,12 @@ def lift_at_fraction(
     return float(np.mean(y_true[ordered]) / prevalence)
 
 
-def evaluate_probabilities(
-    y_true: np.ndarray, probabilities: np.ndarray, top_fraction: float = 0.1
+def _evaluate_scores(
+    labels: np.ndarray,
+    scores: np.ndarray,
+    top_fraction: float,
+    brier_score: float | None,
 ) -> ModelMetrics:
-    """Calculate discrimination, calibration, and campaign ranking metrics."""
-    labels = np.asarray(y_true, dtype=int)
-    scores = np.asarray(probabilities, dtype=float)
-    _validate_binary_inputs(labels, scores)
-    if not 0 < top_fraction <= 1:
-        raise ValueError("top_fraction must be in (0, 1]")
     top_count = max(1, ceil(len(labels) * top_fraction))
     ordered = np.argsort(-scores, kind="stable")[:top_count]
     positives_at_k = float(labels[ordered].sum())
@@ -64,8 +61,37 @@ def evaluate_probabilities(
         prevalence=prevalence,
         pr_auc=float(average_precision_score(labels, scores)),
         roc_auc=float(roc_auc_score(labels, scores)),
-        brier_score=float(brier_score_loss(labels, scores)),
+        brier_score=brier_score,
         precision_at_k=precision_at_k,
         recall_at_k=positives_at_k / float(labels.sum()),
         lift_at_k=precision_at_k / prevalence,
+    )
+
+
+def evaluate_ranking(
+    y_true: np.ndarray, scores: np.ndarray, top_fraction: float = 0.1
+) -> ModelMetrics:
+    """Evaluate raw ranking scores without treating them as probabilities."""
+    labels = np.asarray(y_true, dtype=int)
+    ranking_scores = np.asarray(scores, dtype=float)
+    _validate_binary_inputs(labels, ranking_scores)
+    if not 0 < top_fraction <= 1:
+        raise ValueError("top_fraction must be in (0, 1]")
+    return _evaluate_scores(labels, ranking_scores, top_fraction, brier_score=None)
+
+
+def evaluate_probabilities(
+    y_true: np.ndarray, probabilities: np.ndarray, top_fraction: float = 0.1
+) -> ModelMetrics:
+    """Calculate ranking and calibration metrics from predicted probabilities."""
+    labels = np.asarray(y_true, dtype=int)
+    scores = np.asarray(probabilities, dtype=float)
+    _validate_binary_inputs(labels, scores)
+    if not 0 < top_fraction <= 1:
+        raise ValueError("top_fraction must be in (0, 1]")
+    return _evaluate_scores(
+        labels,
+        scores,
+        top_fraction,
+        brier_score=float(brier_score_loss(labels, scores)),
     )

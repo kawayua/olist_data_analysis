@@ -6,7 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.ml.evaluate import evaluate_probabilities, lift_at_fraction
+from src.ml.evaluate import (
+    evaluate_probabilities,
+    evaluate_ranking,
+    lift_at_fraction,
+)
 from src.ml.train import (
     business_baseline_scores,
     train_candidates,
@@ -31,6 +35,15 @@ def test_evaluate_probabilities_reports_top_k_ranking_metrics():
     assert metrics.precision_at_k == 1.0
     assert metrics.recall_at_k == 1.0
     assert metrics.lift_at_k == 2.5
+
+
+def test_evaluate_ranking_accepts_raw_business_scores_without_brier_score():
+    metrics = evaluate_ranking(
+        np.array([1, 0, 0]), np.array([4099.99, 100.0, 10.0])
+    )
+
+    assert metrics.brier_score is None
+    assert metrics.lift_at_k == 3.0
 
 
 def test_single_class_labels_raise_clear_error():
