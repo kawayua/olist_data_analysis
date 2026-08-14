@@ -812,7 +812,7 @@ Commit: `git commit -m 'feat: add product and delivery evidence analysis'`。
 
 ### Task 10（Day 12–13）: 构建 Streamlit 分析 Dashboard
 
-**学习目标：** 掌握缓存、筛选器状态、业务叙事和可复用图表组件。
+**学习目标：** 掌
 
 **Files:**
 - Create: `app/Home.py`

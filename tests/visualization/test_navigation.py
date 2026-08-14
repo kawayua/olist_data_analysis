@@ -34,8 +34,8 @@ def test_navigation_uses_wide_links_with_interaction_states():
     layout = Path("app/components/layout.py").read_text(encoding="utf-8")
     navigation = Path("app/components/navigation.py").read_text(encoding="utf-8")
 
-    assert "width: min(100%, 1520px)" in layout
-    assert "max-width: calc(100vw - 2rem)" in layout
+    assert "width: min(960px, calc(100vw - 8rem)) !important" in layout
+    assert "max-width: none !important" in layout
     assert ":hover" in layout
     assert ":focus-visible" in layout
     assert '[aria-current="page"]' in layout
@@ -46,7 +46,9 @@ def test_navigation_uses_wide_links_with_interaction_states():
 def test_navigation_widens_single_row_for_six_links_without_clipping():
     layout = Path("app/components/layout.py").read_text(encoding="utf-8")
 
-    assert "width: min(100%, 1520px)" in layout
+    assert "width: min(960px, calc(100vw - 8rem)) !important" in layout
     assert "flex: 1 1 0" in layout
-    assert "overflow-x: auto" in layout
+    assert "overflow-x: hidden" in layout
     assert "font-size: 1.25rem" in layout
+    assert '[data-testid="stColumn"]' in layout
+    assert "min-width: 0 !important" in layout

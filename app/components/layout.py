@@ -21,19 +21,29 @@ def apply_dashboard_theme() -> None:
             padding-left: clamp(1.5rem, 4vw, 6rem) !important;
             padding-right: clamp(1.5rem, 4vw, 6rem) !important;
         }
-        .st-key-floating-navigation {
-            position: sticky; top: 12px; z-index: 999;
-            left: 50%; transform: translateX(-50%);
-            width: min(100%, 1520px); margin: 48px 0 1rem;
-        }
-        .st-key-floating-navigation [data-testid="stHorizontalBlock"] {
-            display: flex; flex-wrap: nowrap; justify-content: center; gap: 0.5rem;
-            width: min(100%, 1520px); max-width: calc(100vw - 2rem); padding: 0.65rem;
-            overflow-x: auto;
-            background: rgba(255, 255, 255, 0.76); border: 1px solid #e5eaf1;
-            border-radius: 28px; box-shadow: 0 8px 24px rgba(20, 42, 74, 0.12);
-            backdrop-filter: blur(12px);
-        }
+.st-key-floating-navigation {
+    position: sticky; top: 12px; z-index: 999;
+    left: 50%; transform: translateX(-50%);
+    width: min(960px, calc(100vw - 8rem)) !important;
+    margin: 48px 0 1rem;
+}
+
+.st-key-floating-navigation [data-testid="stHorizontalBlock"] {
+    display: flex; flex-wrap: nowrap; justify-content: center; gap: 0.5rem;
+    width: min(960px, calc(100vw - 8rem)) !important;
+    max-width: none !important;
+    padding: 0.65rem;
+    overflow-x: hidden;
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid #e5eaf1;
+    border-radius: 28px;
+    box-shadow: 0 8px 24px rgba(20, 42, 74, 0.12);
+    backdrop-filter: blur(12px);
+}
+.st-key-floating-navigation [data-testid="stColumn"] {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+}
         .st-key-floating-navigation [data-testid="stPageLink-NavLink"] {
             flex: 1 1 0; min-height: 3.1rem; border-radius: 22px;
             color: #355070; font-size: 1.25rem; font-weight: 650;
