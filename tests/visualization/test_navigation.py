@@ -46,6 +46,7 @@ def test_navigation_uses_wide_links_with_interaction_states():
 def test_navigation_widens_single_row_for_six_links_without_clipping():
     layout = Path("app/components/layout.py").read_text(encoding="utf-8")
 
-    assert "width: min(100%, 760px)" in layout
+    assert "width: min(100%, 1520px)" in layout
     assert "flex: 1 1 0" in layout
     assert "overflow-x: auto" in layout
+    assert "font-size: 1.25rem" in layout
