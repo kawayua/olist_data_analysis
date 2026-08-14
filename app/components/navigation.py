@@ -3,11 +3,11 @@
 import streamlit as st
 
 NAVIGATION_PAGES = (
-    ("app/pages/1_经营总览.py", "经营总览"),
-    ("app/pages/2_增长诊断.py", "增长诊断"),
-    ("app/pages/3_留存复购.py", "留存复购"),
-    ("app/pages/4_客户价值.py", "客户价值"),
-    ("app/pages/5_商品与履约.py", "商品与履约"),
+    ("pages/1_经营总览.py", "经营总览"),
+    ("pages/2_增长诊断.py", "增长诊断"),
+    ("pages/3_留存复购.py", "留存复购"),
+    ("pages/4_客户价值.py", "客户价值"),
+    ("pages/5_商品与履约.py", "商品与履约"),
 )
 
 
