@@ -30,7 +30,7 @@ def test_simulator_calculates_incremental_profit_for_top_customers():
 def test_simulator_spends_budget_on_highest_probability_customers_only():
     """A missing probability sort would contact low-value customers first."""
     result = simulate_roi(
-        pd.Series([0.2, 0.9, 0.1]),
+        pd.Series([0.2, 0.1, 0.9]),
         20,
         10,
         100,
@@ -55,6 +55,21 @@ def test_simulator_limits_contacts_to_budget_capacity():
 
     assert result.contacted_customers == 1
     assert result.marketing_cost == 10.0
+
+
+def test_simulator_limits_contacts_to_maximum_contact_fraction():
+    """An ignored contact-fraction cap would overstate the executable audience."""
+    result = simulate_roi(
+        pd.Series([0.9, 0.8, 0.7, 0.6, 0.5]),
+        1_000,
+        10,
+        100,
+        (Scenario("基准", 0.1),),
+        0.4,
+    )[0]
+
+    assert result.contacted_customers == 2
+    assert result.marketing_cost == 20.0
 
 
 def test_simulator_higher_uplift_produces_higher_profit():
