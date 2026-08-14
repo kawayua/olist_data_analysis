@@ -7,12 +7,16 @@ import pandas as pd
 import pytest
 
 from src.ml.evaluate import (
+    ModelMetrics,
     evaluate_probabilities,
     evaluate_ranking,
     lift_at_fraction,
 )
 from src.ml.train import (
     business_baseline_scores,
+    predict_probabilities,
+    select_best_candidate,
+    train_candidate_models,
     train_candidates,
     write_model_comparison,
 )
@@ -76,6 +80,54 @@ def test_train_candidates_returns_balanced_pipeline_scores():
 
     assert result.model.named_steps["classifier"].class_weight == "balanced"
     assert len(result.train_scores) == len(frame)
+
+
+def test_select_best_candidate_prioritizes_pr_auc_then_lift_at_k():
+    baseline_metrics = {
+        "prevalence": 0.1,
+        "roc_auc": 0.6,
+        "brier_score": 0.09,
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.2,
+    }
+    metrics_by_name = {
+        "logistic_regression": ModelMetrics(
+            pr_auc=0.03, lift_at_k=4.0, **baseline_metrics
+        ),
+        "random_forest": ModelMetrics(
+            pr_auc=0.04, lift_at_k=1.5, **baseline_metrics
+        ),
+        "lightgbm": ModelMetrics(
+            pr_auc=0.04, lift_at_k=3.0, **baseline_metrics
+        ),
+    }
+
+    assert select_best_candidate(metrics_by_name) == "lightgbm"
+
+
+def test_train_candidate_models_returns_three_candidates_with_probabilities():
+    def candidate_frame(start: int, size: int) -> pd.DataFrame:
+        sequence = np.arange(start, start + size)
+        return pd.DataFrame(
+            {
+                "first_order_item_count": sequence % 4 + 1,
+                "first_order_item_revenue": sequence.astype(float) * 10.0,
+                "first_order_freight_revenue": sequence.astype(float) % 7 + 1.0,
+                "first_order_payment_value": sequence.astype(float) * 11.0,
+                "first_order_delivery_days": sequence.astype(float) % 10 + 1.0,
+                "first_order_distinct_category_count": sequence % 3 + 1,
+                "repurchased_within_90d": sequence % 2 == 0,
+            }
+        )
+
+    training_frame = candidate_frame(start=0, size=120)
+    early_stopping_frame = candidate_frame(start=120, size=60)
+
+    results = train_candidate_models(training_frame, early_stopping_frame)
+    probabilities = predict_probabilities(results["lightgbm"], early_stopping_frame)
+
+    assert set(results) == {"logistic_regression", "random_forest", "lightgbm"}
+    assert np.all((0.0 <= probabilities) & (probabilities <= 1.0))
 
 
 def test_model_comparison_writer_includes_auditable_context(tmp_path):
