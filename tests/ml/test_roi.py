@@ -3,7 +3,11 @@
 import pandas as pd
 import pytest
 
-from src.ml.roi import Scenario, simulate_roi
+from src.ml.roi import (
+    Scenario,
+    recommend_profit_maximizing_plan,
+    simulate_roi,
+)
 
 
 def test_simulator_calculates_incremental_profit_for_top_customers():
@@ -130,3 +134,17 @@ def test_simulator_rejects_budget_that_cannot_cover_one_contact():
             (Scenario("基准", 0.1),),
             1.0,
         )
+
+
+def test_recommendation_uses_net_incremental_profit_not_roi():
+    """An ROI-only ranking would incorrectly prefer the smallest budget."""
+    result = recommend_profit_maximizing_plan(
+        pd.Series([0.9, 0.8, 0.7]),
+        (10, 20, 30),
+        10,
+        100,
+        Scenario("基准", 0.5),
+        1.0,
+    )
+
+    assert result.contacted_customers == 3

@@ -117,3 +117,38 @@ def simulate_roi(
             )
         )
     return results
+
+
+def recommend_profit_maximizing_plan(
+    probabilities: pd.Series,
+    budget_options: tuple[float, ...],
+    contact_cost: float,
+    average_repurchase_revenue: float,
+    baseline_scenario: Scenario,
+    max_contact_fraction: float,
+) -> SimulationResult:
+    """Return the baseline plan with the greatest net incremental profit."""
+    if not budget_options:
+        raise ValueError("budget_options must not be empty")
+
+    candidates = [
+        (
+            budget,
+            simulate_roi(
+                probabilities,
+                budget,
+                contact_cost,
+                average_repurchase_revenue,
+                (baseline_scenario,),
+                max_contact_fraction,
+            )[0],
+        )
+        for budget in budget_options
+    ]
+    return max(
+        candidates,
+        key=lambda candidate: (
+            candidate[1].net_incremental_profit,
+            -candidate[0],
+        ),
+    )[1]
