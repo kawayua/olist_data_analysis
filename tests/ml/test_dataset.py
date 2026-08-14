@@ -5,6 +5,8 @@ import pandas as pd
 from src.ml.dataset import (
     build_training_frame,
     make_repurchase_label,
+    split_training_for_early_stopping,
+    temporal_four_way_split,
     temporal_split,
 )
 
@@ -47,3 +49,45 @@ def test_temporal_split_keeps_time_ranges_strictly_ordered():
 
     assert train.prediction_time.max() < validation.prediction_time.min()
     assert validation.prediction_time.max() < test.prediction_time.min()
+
+
+def test_temporal_four_way_split_keeps_time_ranges_strictly_ordered():
+    frame = pd.DataFrame(
+        {
+            "prediction_time": pd.to_datetime(
+                [
+                    "2018-01-01",
+                    "2018-02-01",
+                    "2018-03-01",
+                    "2018-04-01",
+                    "2018-05-01",
+                    "2018-06-01",
+                    "2018-07-01",
+                    "2018-08-01",
+                ]
+            )
+        }
+    )
+
+    train, selection, calibration, test = temporal_four_way_split(
+        frame,
+        pd.Timestamp("2018-02-15"),
+        pd.Timestamp("2018-04-15"),
+        pd.Timestamp("2018-06-15"),
+    )
+
+    assert train.prediction_time.max() < selection.prediction_time.min()
+    assert selection.prediction_time.max() < calibration.prediction_time.min()
+    assert calibration.prediction_time.max() < test.prediction_time.min()
+
+
+def test_split_training_for_early_stopping_reserves_latest_rows():
+    frame = pd.DataFrame(
+        {"prediction_time": pd.date_range("2018-01-01", periods=10, freq="D")}
+    )
+
+    fitting, early_stopping = split_training_for_early_stopping(frame, 0.2)
+
+    assert len(fitting) == 8
+    assert len(early_stopping) == 2
+    assert fitting.prediction_time.max() < early_stopping.prediction_time.min()
