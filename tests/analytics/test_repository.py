@@ -93,3 +93,26 @@ def test_repository_exposes_customer_value_and_repurchase_marts(monkeypatch):
     assert "marts.repurchase_behavior" in queries[1]
     assert "marts.repurchase_intervals" in queries[2]
     assert "marts.delivery_rating_analysis" in queries[3]
+
+
+def test_repository_reads_only_time_safe_features_for_model_scoring(monkeypatch):
+    """Selecting labels or future fields would leak outcomes into live scoring."""
+    captured = {}
+
+    def fake_read_sql(query, engine, params):
+        captured["sql"] = str(query)
+        captured["params"] = params
+        return pd.DataFrame({"customer_key": [42]})
+
+    monkeypatch.setattr("src.analytics.repository.pd.read_sql", fake_read_sql)
+    repository = AnalyticsRepository(engine=object())
+
+    frame = repository.ml_customer_features_for_scoring()
+
+    assert frame["customer_key"].tolist() == [42]
+    assert "marts.ml_customer_features" in captured["sql"]
+    assert "first_order_item_revenue" in captured["sql"]
+    assert "SELECT *" not in captured["sql"].upper()
+    assert "repurchased_within_90d" not in captured["sql"]
+    assert "future_" not in captured["sql"]
+    assert captured["params"] == {}

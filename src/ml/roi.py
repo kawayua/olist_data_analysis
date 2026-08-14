@@ -152,3 +152,32 @@ def recommend_profit_maximizing_plan(
             -candidate[0],
         ),
     )[1]
+
+
+def build_profit_curve(
+    probabilities: pd.Series,
+    budget_options: tuple[float, ...],
+    contact_cost: float,
+    average_repurchase_revenue: float,
+    baseline_scenario: Scenario,
+    max_contact_fraction: float,
+) -> pd.DataFrame:
+    """Build baseline profit and ROI values for every candidate budget."""
+    rows = []
+    for budget in budget_options:
+        result = simulate_roi(
+            probabilities,
+            budget,
+            contact_cost,
+            average_repurchase_revenue,
+            (baseline_scenario,),
+            max_contact_fraction,
+        )[0]
+        rows.append(
+            {
+                "预算": float(budget),
+                "净增量利润": result.net_incremental_profit,
+                "ROI": result.roi,
+            }
+        )
+    return pd.DataFrame(rows, columns=["预算", "净增量利润", "ROI"])

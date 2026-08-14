@@ -5,6 +5,7 @@ import pytest
 
 from src.ml.roi import (
     Scenario,
+    build_profit_curve,
     recommend_profit_maximizing_plan,
     simulate_roi,
 )
@@ -163,3 +164,18 @@ def test_recommendation_prefers_lower_budget_when_net_profit_is_tied():
 
     assert result.contacted_customers == 1
     assert result.marketing_cost == 10.0
+
+
+def test_profit_curve_contains_each_budget_option():
+    """Dropping a budget option would make the profit curve incomplete."""
+    curve = build_profit_curve(
+        pd.Series([0.9, 0.8, 0.7]),
+        (10, 20, 30),
+        10,
+        100,
+        Scenario("基准", 0.5),
+        1.0,
+    )
+
+    assert list(curve.columns) == ["预算", "净增量利润", "ROI"]
+    assert curve["预算"].tolist() == [10.0, 20.0, 30.0]

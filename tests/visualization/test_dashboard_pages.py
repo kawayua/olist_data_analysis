@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-def test_dashboard_contains_five_governed_analysis_pages():
+def test_dashboard_contains_six_governed_analysis_pages():
     page_directory = Path("app/pages")
     expected_pages = {
         "1_经营总览.py",
@@ -9,6 +9,7 @@ def test_dashboard_contains_five_governed_analysis_pages():
         "3_留存复购.py",
         "4_客户价值.py",
         "5_商品与履约.py",
+        "6_营销ROI模拟器.py",
     }
 
     assert {path.name for path in page_directory.glob("*.py")} == expected_pages

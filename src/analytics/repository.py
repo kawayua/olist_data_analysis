@@ -97,6 +97,25 @@ class AnalyticsRepository:
             "average_delivery_vs_estimate_days",
         )
 
+    def ml_customer_features_for_scoring(self) -> pd.DataFrame:
+        """Return identifiers and time-safe first-order features for scoring."""
+        query = text(
+            """
+            SELECT
+                customer_key,
+                prediction_time,
+                first_order_item_count,
+                first_order_item_revenue,
+                first_order_freight_revenue,
+                first_order_payment_value,
+                first_order_delivery_days,
+                first_order_distinct_category_count
+            FROM marts.ml_customer_features
+            ORDER BY prediction_time DESC, customer_key
+            """
+        )
+        return pd.read_sql(query, self._engine, params={})
+
     def available_customer_states(self) -> pd.DataFrame:
         """Return customer receiving states available to the Dashboard filter."""
         return self._read_mart("marts.state_performance", [], {}, "customer_state")
