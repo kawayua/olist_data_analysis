@@ -30,14 +30,22 @@ def test_navigation_css_hides_entire_sidebar_and_centers_glass_pill():
     assert "border-radius: 28px" in content
 
 
-def test_navigation_uses_content_width_links_with_interaction_states():
+def test_navigation_uses_wide_links_with_interaction_states():
     layout = Path("app/components/layout.py").read_text(encoding="utf-8")
     navigation = Path("app/components/navigation.py").read_text(encoding="utf-8")
 
-    assert "width: fit-content" in layout
+    assert "width: min(100%, 760px)" in layout
     assert "max-width: calc(100vw - 2rem)" in layout
     assert ":hover" in layout
     assert ":focus-visible" in layout
     assert '[aria-current="page"]' in layout
     assert "transform: translateX(-50%)" in layout
     assert "use_container_width" not in navigation
+
+
+def test_navigation_widens_single_row_for_six_links_without_clipping():
+    layout = Path("app/components/layout.py").read_text(encoding="utf-8")
+
+    assert "width: min(100%, 760px)" in layout
+    assert "flex: 1 1 0" in layout
+    assert "overflow-x: auto" in layout
