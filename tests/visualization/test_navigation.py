@@ -21,7 +21,8 @@ def test_every_page_uses_shared_navigation():
 def test_navigation_css_hides_entire_sidebar_and_centers_glass_pill():
     content = Path("app/components/layout.py").read_text(encoding="utf-8")
 
-    assert '[data-testid="stSidebar"] { display: none; }' in content
+    assert '[data-testid="stSidebar"],' in content
+    assert 'display: none !important;' in content
     assert "justify-content: center" in content
     assert "top: 48px" in content
     assert "border-radius: 28px" in content
