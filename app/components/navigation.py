@@ -15,4 +15,4 @@ def render_navigation() -> None:
     """Render links for the dashboard's five analysis pages."""
     with st.container(key="floating-navigation"):
         for path, label in NAVIGATION_PAGES:
-            st.page_link(path, label=label, use_container_width=True)
+            st.page_link(path, label=label)

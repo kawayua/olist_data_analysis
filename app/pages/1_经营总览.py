@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_state_filter
+from app.components.filters import DashboardFilters
 from app.components.kpis import format_kpi_value, render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
@@ -36,16 +36,15 @@ render_navigation()
 render_page_header(
     "经营总览",
     "从整体交易规模、月度趋势、核心品类与客户收货州观察经营现状。",
-    "州筛选仅影响州表现；月度趋势和品类排名使用全局完整月份口径。",
+    "全局完整月份口径；不提供页面筛选。",
 )
-filters = render_state_filter(get_repository())
-frame = load_state_performance(filters)
+frame = load_state_performance(DashboardFilters())
 monthly = load_monthly_growth()
 products = load_product_performance()
 if frame.empty:
-    st.info("当前筛选没有州表现数据。请清除客户所在州后重试。")
+    st.info("当前没有州表现数据。请重建分析集市后重试。")
 else:
-    totals = frame.iloc[0] if filters.customer_state else summarize_state_performance(frame)
+    totals = summarize_state_performance(frame)
     render_kpis(
         [
             (
@@ -94,8 +93,7 @@ else:
             ),
             use_container_width=True,
         )
-        st.caption("口径：州指客户收货地址州；该页面的州筛选真实生效。")
-        st.caption("州指客户收货地址州；州筛选只影响本图和 KPI。")
+        st.caption("口径：州指客户收货地址州；指标使用全局完整月份数据。")
     with right, st.container(border=True):
         st.subheader("核心品类 Top 10")
         st.plotly_chart(

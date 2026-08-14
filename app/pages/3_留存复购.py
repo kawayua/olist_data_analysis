@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_cohort_filter
+from app.components.filters import DashboardFilters
 from app.components.layout import (
     apply_dashboard_theme,
     render_insight,
@@ -35,14 +35,13 @@ render_navigation()
 render_page_header(
     "留存与复购",
     "用月度 Cohort、30/60/90 天复购率与二购间隔识别持续购买的机会。",
-    "Cohort 筛选仅影响留存矩阵；复购率使用具有完整观察期的客户作为分母。",
+    "全局 Cohort 口径；复购率使用具有完整观察期的客户作为分母。",
 )
-filters = render_cohort_filter()
-cohort = load_cohort_retention(filters)
+cohort = load_cohort_retention(DashboardFilters())
 behavior = load_repurchase_behavior()
 intervals = load_repurchase_intervals()
 if cohort.empty or behavior.empty:
-    st.info("当前筛选没有完整 Cohort 数据。请清除首购月份或包含不完整观察月后重试。")
+    st.info("当前没有完整 Cohort 数据。请重建分析集市后重试。")
 else:
     rates = behavior.groupby("horizon_days", as_index=False).agg(
         eligible_customers=("eligible_customers", "sum"),

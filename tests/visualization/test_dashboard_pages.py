@@ -13,26 +13,33 @@ def test_dashboard_contains_five_governed_analysis_pages():
 
     assert {path.name for path in page_directory.glob("*.py")} == expected_pages
 
-    expected_filters = {
-        "1_经营总览.py": "render_state_filter",
-        "2_增长诊断.py": "render_month_filter",
-        "3_留存复购.py": "render_cohort_filter",
-        "4_客户价值.py": None,
-        "5_商品与履约.py": "render_category_filter",
-    }
     for page in page_directory.glob("*.py"):
         content = page.read_text(encoding="utf-8")
-        expected_filter = expected_filters[page.name]
-        if expected_filter is None:
-            assert "render_filters" not in content
-            assert "render_state_filter" not in content
-            assert "render_month_filter" not in content
-            assert "render_cohort_filter" not in content
-            assert "render_category_filter" not in content
-        else:
-            assert expected_filter in content
+        assert "render_filters" not in content
+        assert "render_state_filter" not in content
+        assert "render_month_filter" not in content
+        assert "render_cohort_filter" not in content
+        assert "render_category_filter" not in content
+        assert "filters =" not in content
         assert "get_repository" in content
         assert "st.info" in content
+
+
+def test_filtered_analysis_loaders_use_default_dashboard_filters():
+    for page in [
+        Path("app/pages/1_经营总览.py"),
+        Path("app/pages/2_增长诊断.py"),
+        Path("app/pages/3_留存复购.py"),
+        Path("app/pages/5_商品与履约.py"),
+    ]:
+        assert "DashboardFilters()" in page.read_text(encoding="utf-8")
+
+
+def test_empty_states_do_not_instruct_users_to_change_removed_filters():
+    for page in Path("app/pages").glob("*.py"):
+        content = page.read_text(encoding="utf-8")
+        assert "当前筛选" not in content
+        assert "请清除" not in content
 
 
 def test_dashboard_pages_apply_shared_theme_and_header():

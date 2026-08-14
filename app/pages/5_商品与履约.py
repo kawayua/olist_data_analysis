@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from app.components.filters import DashboardFilters, render_category_filter
+from app.components.filters import DashboardFilters
 from app.components.kpis import format_kpi_value, render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
@@ -36,21 +36,20 @@ render_navigation()
 render_page_header(
     "商品与履约",
     "沿着商品、订单、配送与评分的链路定位体验风险。",
-    "品类筛选仅影响商品表现；州履约与延迟—评分分析保持全局口径。",
+    "全局商品、履约与评分口径；不提供页面筛选。",
 )
-filters = render_category_filter()
-products = load_product_performance(filters)
+products = load_product_performance(DashboardFilters())
 states = load_state_performance()
 ratings = load_delivery_rating_analysis()
 if products.empty or states.empty or ratings.empty:
-    st.info("当前没有商品或履约数据。请清除品类条件或重建分析集市后重试。")
+    st.info("当前没有商品或履约数据。请重建分析集市后重试。")
 else:
     top_ten_share = products.head(10).item_revenue.sum() / products.item_revenue.sum() * 100
     weighted_review = (states.average_review_score * states.order_count).sum() / states.order_count.sum()
     render_kpis(
         [
             ("品类数", format_kpi_value(len(products)), "商品表现集市"),
-            ("Top 10 商品金额占比", format_kpi_value(top_ten_share, suffix="%", decimals=3), "当前品类筛选范围"),
+            ("Top 10 商品金额占比", format_kpi_value(top_ten_share, suffix="%", decimals=3), "全局商品表现"),
             ("平均配送天数", format_kpi_value((states.average_delivery_days * states.order_count).sum() / states.order_count.sum(), decimals=3), "全局客户收货州"),
             ("延迟率", format_kpi_value((states.delayed_delivery_rate_pct * states.order_count).sum() / states.order_count.sum(), suffix="%", decimals=3), "全局已送达订单"),
             ("平均评分", format_kpi_value(weighted_review, decimals=3), "订单平均评分"),
@@ -60,7 +59,7 @@ else:
     left, right = st.columns(2)
     with left, st.container(border=True):
         st.plotly_chart(bubble_scatter_chart(products, "order_count", "item_revenue", "average_review_score", "品类商品金额与订单量", color="product_category"), use_container_width=True)
-        st.caption("横轴为订单数，纵轴为商品金额，气泡面积为平均评分；品类筛选真实生效。")
+        st.caption("横轴为订单数，纵轴为商品金额，气泡面积为平均评分。")
     with right, st.container(border=True):
         st.plotly_chart(ranked_bar_chart(states, "customer_state", "delayed_delivery_rate_pct", "客户收货州延迟率"), use_container_width=True)
         st.dataframe(display_dataframe(states), use_container_width=True, hide_index=True)

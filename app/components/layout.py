@@ -11,24 +11,23 @@ def apply_dashboard_theme() -> None:
         """
         <style>
         .stApp { background: #f6f8fb; }
-        [data-testid="stSidebar"] { background: #ffffff; }
-        [data-testid="stSidebarNav"] { display: none; }
-        [data-testid="stSidebar"] h2 { color: #172b4d; font-size: 1.1rem; }
+        [data-testid="stSidebar"] { display: none; }
         .st-key-floating-navigation {
-            position: sticky; top: 12px; z-index: 999;
-            margin: 0.25rem 0 1rem;
+            position: sticky; top: 48px; z-index: 999;
+            display: flex; justify-content: center;
+            width: 100%; margin: 0 0 1rem;
         }
         .st-key-floating-navigation > div {
-            display: flex; flex-wrap: wrap; gap: 0.35rem;
-            padding: 0.45rem; background: rgba(255, 255, 255, 0.92);
-            border: 1px solid #e5eaf1; border-radius: 14px;
-            box-shadow: 0 6px 18px rgba(20, 42, 74, 0.10);
-            backdrop-filter: blur(10px);
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem;
+            width: fit-content; max-width: calc(100vw - 2rem); padding: 0.45rem;
+            background: rgba(255, 255, 255, 0.76); border: 1px solid #e5eaf1;
+            border-radius: 28px; box-shadow: 0 8px 24px rgba(20, 42, 74, 0.12);
+            backdrop-filter: blur(12px);
         }
         .st-key-floating-navigation [data-testid="stPageLink-NavLink"] {
-            flex: 1 1 8.5rem; min-height: 2.5rem; border-radius: 9px;
+            flex: 0 1 auto; min-height: 2.5rem; border-radius: 20px;
             color: #355070; font-weight: 600;
-            transition: background-color 150ms ease, color 150ms ease;
+            transition: background-color 180ms ease, color 180ms ease;
         }
         .st-key-floating-navigation [data-testid="stPageLink-NavLink"]:hover {
             background: #edf3fa; color: #172b4d;
@@ -49,8 +48,9 @@ def apply_dashboard_theme() -> None:
         .dashboard-kpi-help { color: #758399; font-size: 0.8rem; margin-top: 0.35rem; }
         .dashboard-scope { color: #5b6b82; font-size: 0.9rem; }
         @media (max-width: 700px) {
-            .st-key-floating-navigation { top: 8px; }
-            .st-key-floating-navigation [data-testid="stPageLink-NavLink"] { flex-basis: 100%; }
+            .st-key-floating-navigation { top: 16px; }
+            .st-key-floating-navigation > div { max-width: calc(100vw - 1rem); }
+            .st-key-floating-navigation [data-testid="stPageLink-NavLink"] { flex: 1 1 8.5rem; justify-content: center; }
             .dashboard-card { margin-bottom: 0.75rem; }
             .dashboard-kpi-value { font-size: 1.4rem; }
         }
