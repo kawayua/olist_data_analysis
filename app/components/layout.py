@@ -14,24 +14,29 @@ def apply_dashboard_theme() -> None:
         [data-testid="stSidebar"],
         [data-testid="stSidebarCollapsedControl"],
         [data-testid="stSidebarCollapseButton"] { display: none !important; }
+        [data-testid="stMain"] .block-container,
+        [data-testid="stMainBlockContainer"],
         [data-testid="stAppViewContainer"] .main .block-container {
-            max-width: none; padding-left: 3rem; padding-right: 3rem;
+            width: 100% !important; max-width: none !important;
+            padding-left: clamp(1.5rem, 4vw, 6rem) !important;
+            padding-right: clamp(1.5rem, 4vw, 6rem) !important;
         }
         .st-key-floating-navigation {
-            position: sticky; top: 48px; z-index: 999;
-            display: flex; justify-content: center;
-            width: 100%; margin: 0 0 1rem;
+            position: sticky; top: 12px; z-index: 999;
+            left: 50%; transform: translateX(-50%);
+            width: fit-content; margin: 48px 0 1rem;
         }
         .st-key-floating-navigation [data-testid="stHorizontalBlock"] {
-            display: flex; flex-wrap: nowrap; justify-content: center; gap: 0.35rem;
-            width: fit-content; max-width: calc(100vw - 2rem); padding: 0.45rem;
+            display: flex; flex-wrap: nowrap; justify-content: center; gap: 0.5rem;
+            width: fit-content; max-width: calc(100vw - 2rem); padding: 0.65rem;
             background: rgba(255, 255, 255, 0.76); border: 1px solid #e5eaf1;
             border-radius: 28px; box-shadow: 0 8px 24px rgba(20, 42, 74, 0.12);
             backdrop-filter: blur(12px);
         }
         .st-key-floating-navigation [data-testid="stPageLink-NavLink"] {
-            flex: 0 1 auto; min-height: 2.5rem; border-radius: 20px;
-            color: #355070; font-weight: 600;
+            flex: 0 1 auto; min-height: 3.1rem; border-radius: 22px;
+            color: #355070; font-size: 1.05rem; font-weight: 650;
+            padding: 0.65rem 1rem;
             transition: background-color 180ms ease, color 180ms ease;
         }
         .st-key-floating-navigation [data-testid="stPageLink-NavLink"]:hover {
@@ -52,18 +57,6 @@ def apply_dashboard_theme() -> None:
         .dashboard-kpi-value { color: #172b4d; font-size: 1.65rem; font-weight: 700; }
         .dashboard-kpi-help { color: #758399; font-size: 0.8rem; margin-top: 0.35rem; }
         .dashboard-scope { color: #5b6b82; font-size: 0.9rem; }
-        @media (max-width: 700px) {
-            .st-key-floating-navigation { top: 16px; }
-            [data-testid="stAppViewContainer"] .main .block-container {
-                padding-left: 1rem; padding-right: 1rem;
-            }
-            .st-key-floating-navigation [data-testid="stHorizontalBlock"] {
-                max-width: calc(100vw - 1rem); flex-wrap: wrap;
-            }
-            .st-key-floating-navigation [data-testid="stPageLink-NavLink"] { flex: 1 1 8.5rem; justify-content: center; }
-            .dashboard-card { margin-bottom: 0.75rem; }
-            .dashboard-kpi-value { font-size: 1.4rem; }
-        }
         </style>
         """,
         unsafe_allow_html=True,

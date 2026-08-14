@@ -24,7 +24,8 @@ def test_navigation_css_hides_entire_sidebar_and_centers_glass_pill():
     assert '[data-testid="stSidebar"],' in content
     assert 'display: none !important;' in content
     assert "justify-content: center" in content
-    assert "top: 48px" in content
+    assert "top: 12px" in content
+    assert "margin: 48px 0 1rem" in content
     assert "border-radius: 28px" in content
 
 
@@ -37,5 +38,5 @@ def test_navigation_uses_content_width_links_with_interaction_states():
     assert ":hover" in layout
     assert ":focus-visible" in layout
     assert '[aria-current="page"]' in layout
-    assert "@media (max-width: 700px)" in layout
+    assert "transform: translateX(-50%)" in layout
     assert "use_container_width" not in navigation

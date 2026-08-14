@@ -20,6 +20,7 @@ def load_monthly_growth(filters: DashboardFilters) -> pd.DataFrame:
     return get_repository().monthly_growth(filters.to_repository_filters())
 
 
+st.set_page_config(page_title="增长诊断", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 apply_dashboard_theme()
 render_navigation()
 render_page_header(

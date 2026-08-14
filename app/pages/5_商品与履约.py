@@ -31,6 +31,7 @@ def load_delivery_rating_analysis() -> pd.DataFrame:
     return get_repository().delivery_rating_analysis()
 
 
+st.set_page_config(page_title="商品与履约", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 apply_dashboard_theme()
 render_navigation()
 render_page_header(

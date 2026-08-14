@@ -19,6 +19,7 @@ def load_customer_value() -> pd.DataFrame:
     return get_repository().customer_value_analysis()
 
 
+st.set_page_config(page_title="客户价值", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 apply_dashboard_theme()
 render_navigation()
 render_page_header(

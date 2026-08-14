@@ -30,6 +30,7 @@ def load_repurchase_intervals() -> pd.DataFrame:
     return get_repository().repurchase_intervals()
 
 
+st.set_page_config(page_title="留存复购", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 apply_dashboard_theme()
 render_navigation()
 render_page_header(

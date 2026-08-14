@@ -31,6 +31,7 @@ def load_product_performance() -> pd.DataFrame:
     return get_repository().product_performance(DashboardFilters().to_repository_filters())
 
 
+st.set_page_config(page_title="经营总览", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 apply_dashboard_theme()
 render_navigation()
 render_page_header(
