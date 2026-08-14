@@ -148,3 +148,18 @@ def test_recommendation_uses_net_incremental_profit_not_roi():
     )
 
     assert result.contacted_customers == 3
+
+
+def test_recommendation_prefers_lower_budget_when_net_profit_is_tied():
+    """A tie-break regression must not select a higher-cost campaign."""
+    result = recommend_profit_maximizing_plan(
+        pd.Series([0.2, 0.2]),
+        (20, 10),
+        10,
+        100,
+        Scenario("baseline", 0.5),
+        1.0,
+    )
+
+    assert result.contacted_customers == 1
+    assert result.marketing_cost == 10.0
