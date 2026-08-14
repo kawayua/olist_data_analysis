@@ -34,7 +34,7 @@ def test_navigation_uses_wide_links_with_interaction_states():
     layout = Path("app/components/layout.py").read_text(encoding="utf-8")
     navigation = Path("app/components/navigation.py").read_text(encoding="utf-8")
 
-    assert "width: min(100%, 760px)" in layout
+    assert "width: min(100%, 1520px)" in layout
     assert "max-width: calc(100vw - 2rem)" in layout
     assert ":hover" in layout
     assert ":focus-visible" in layout
