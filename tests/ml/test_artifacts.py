@@ -8,7 +8,68 @@ import pandas as pd
 
 from src.ml.artifacts import write_training_artifacts
 from src.ml.calibration import SigmoidCalibrator
+from src.ml.evaluate import ModelMetrics
 from src.ml.train import FEATURE_COLUMNS, train_candidates
+
+
+def _metrics(pr_auc: float, lift_at_k: float, brier_score: float) -> ModelMetrics:
+    return ModelMetrics(
+        prevalence=0.011,
+        pr_auc=pr_auc,
+        roc_auc=0.7,
+        brier_score=brier_score,
+        precision_at_k=0.03,
+        recall_at_k=0.25,
+        lift_at_k=lift_at_k,
+    )
+
+
+def test_metrics_report_preserves_selection_calibration_and_final_test_metrics():
+    """The report must retain every time-isolated metric without Accuracy."""
+    from scripts.train_model import build_metrics_report
+
+    candidate_metrics = {
+        "logistic_regression": _metrics(0.04, 2.5, 0.02),
+        "lightgbm": _metrics(0.06, 3.0, 0.018),
+    }
+    calibration_before = _metrics(0.05, 2.7, 0.019)
+    calibration_after = _metrics(0.05, 2.7, 0.012)
+    final_test = _metrics(0.045, 2.3, 0.014)
+
+    report = build_metrics_report(
+        candidate_metrics,
+        "lightgbm",
+        calibration_before,
+        calibration_after,
+        final_test,
+    )
+
+    assert report["selected_model"] == "lightgbm"
+    assert report["candidate_selection"] == {
+        name: metrics.to_dict() for name, metrics in candidate_metrics.items()
+    }
+    assert report["calibration"] == {
+        "before": calibration_before.to_dict(),
+        "after": calibration_after.to_dict(),
+    }
+    assert report["final_test"] == final_test.to_dict()
+
+    def keys(value):
+        if isinstance(value, dict):
+            return value.keys() | {
+                nested_key
+                for nested_value in value.values()
+                for nested_key in keys(nested_value)
+            }
+        if isinstance(value, list):
+            return {
+                nested_key
+                for nested_value in value
+                for nested_key in keys(nested_value)
+            }
+        return set()
+
+    assert "accuracy" not in keys(report)
 
 
 def _small_training_frame() -> pd.DataFrame:
