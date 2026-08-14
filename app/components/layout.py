@@ -11,14 +11,19 @@ def apply_dashboard_theme() -> None:
         """
         <style>
         .stApp { background: #f6f8fb; }
-        [data-testid="stSidebar"] { display: none; }
+        [data-testid="stSidebar"],
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="stSidebarCollapseButton"] { display: none !important; }
+        [data-testid="stAppViewContainer"] .main .block-container {
+            max-width: none; padding-left: 3rem; padding-right: 3rem;
+        }
         .st-key-floating-navigation {
             position: sticky; top: 48px; z-index: 999;
             display: flex; justify-content: center;
             width: 100%; margin: 0 0 1rem;
         }
-        .st-key-floating-navigation > div {
-            display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem;
+        .st-key-floating-navigation [data-testid="stHorizontalBlock"] {
+            display: flex; flex-wrap: nowrap; justify-content: center; gap: 0.35rem;
             width: fit-content; max-width: calc(100vw - 2rem); padding: 0.45rem;
             background: rgba(255, 255, 255, 0.76); border: 1px solid #e5eaf1;
             border-radius: 28px; box-shadow: 0 8px 24px rgba(20, 42, 74, 0.12);
@@ -49,7 +54,12 @@ def apply_dashboard_theme() -> None:
         .dashboard-scope { color: #5b6b82; font-size: 0.9rem; }
         @media (max-width: 700px) {
             .st-key-floating-navigation { top: 16px; }
-            .st-key-floating-navigation > div { max-width: calc(100vw - 1rem); }
+            [data-testid="stAppViewContainer"] .main .block-container {
+                padding-left: 1rem; padding-right: 1rem;
+            }
+            .st-key-floating-navigation [data-testid="stHorizontalBlock"] {
+                max-width: calc(100vw - 1rem); flex-wrap: wrap;
+            }
             .st-key-floating-navigation [data-testid="stPageLink-NavLink"] { flex: 1 1 8.5rem; justify-content: center; }
             .dashboard-card { margin-bottom: 0.75rem; }
             .dashboard-kpi-value { font-size: 1.4rem; }

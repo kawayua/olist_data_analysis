@@ -14,5 +14,8 @@ NAVIGATION_PAGES = (
 def render_navigation() -> None:
     """Render links for the dashboard's five analysis pages."""
     with st.container(key="floating-navigation"):
-        for path, label in NAVIGATION_PAGES:
-            st.page_link(path, label=label)
+        for column, (path, label) in zip(
+            st.columns(len(NAVIGATION_PAGES), gap="small"), NAVIGATION_PAGES, strict=True
+        ):
+            with column:
+                st.page_link(path, label=label)

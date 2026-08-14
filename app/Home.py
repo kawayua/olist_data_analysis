@@ -61,19 +61,17 @@ def main() -> None:
             ),
         ]
     )
-    left, right = st.columns((2, 1))
-    with left, st.container(border=True):
+    with st.container(border=True):
         st.subheader("客户所在州表现")
         st.dataframe(
             display_dataframe(state_performance),
             use_container_width=True,
             hide_index=True,
         )
-    with right:
-        render_insight(
-            "分析导航",
-            "从经营总览看现状，进入增长诊断解释变化，再用客户价值、留存复购和商品履约定位可执行机会。",
-        )
+    render_insight(
+        "分析导航",
+        "从经营总览看现状，进入增长诊断解释变化，再用客户价值、留存复购和商品履约定位可执行机会。",
+    )
 
 
 if __name__ == "__main__":
