@@ -10,6 +10,7 @@ from app.components.layout import (
     render_insight,
     render_page_header,
 )
+from app.components.navigation import render_navigation
 from app.components.presentation import summarize_state_performance
 from app.Home import get_repository
 from src.visualization.charts import line_chart, ranked_bar_chart
@@ -31,6 +32,7 @@ def load_product_performance() -> pd.DataFrame:
 
 
 apply_dashboard_theme()
+render_navigation()
 render_page_header(
     "经营总览",
     "从整体交易规模、月度趋势、核心品类与客户收货州观察经营现状。",

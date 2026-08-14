@@ -41,7 +41,10 @@ def test_dashboard_pages_apply_shared_theme_and_header():
     for page in dashboard_files:
         content = page.read_text(encoding="utf-8")
         assert "apply_dashboard_theme()" in content
+        assert "render_navigation()" in content
         assert "render_page_header(" in content
+        assert content.index("apply_dashboard_theme()") < content.index("render_navigation()")
+        assert content.index("render_navigation()") < content.index("render_page_header(")
 
 
 def test_dashboard_tables_use_display_ready_dataframes():

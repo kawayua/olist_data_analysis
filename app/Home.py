@@ -10,6 +10,7 @@ from app.components.layout import (
     render_insight,
     render_page_header,
 )
+from app.components.navigation import render_navigation
 from app.components.presentation import display_dataframe, summarize_state_performance
 from src.analytics.repository import AnalyticsRepository
 from src.config import get_settings
@@ -31,6 +32,7 @@ def load_state_performance(filters: DashboardFilters) -> pd.DataFrame:
 def main() -> None:
     st.set_page_config(page_title="Olist 增长分析", page_icon="📈", layout="wide")
     apply_dashboard_theme()
+    render_navigation()
     render_page_header(
         "Olist 电商增长、留存与复购分析",
         "从市场表现进入增长、留存、客户价值与履约诊断。",

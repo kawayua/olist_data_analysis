@@ -10,6 +10,7 @@ from app.components.layout import (
     render_insight,
     render_page_header,
 )
+from app.components.navigation import render_navigation
 from app.Home import get_repository
 from src.visualization.charts import bubble_scatter_chart, line_chart, ranked_bar_chart
 
@@ -20,6 +21,7 @@ def load_monthly_growth(filters: DashboardFilters) -> pd.DataFrame:
 
 
 apply_dashboard_theme()
+render_navigation()
 render_page_header(
     "增长诊断",
     "拆解商品金额变化中的购买用户、购买频次、客单价与新老客贡献。",

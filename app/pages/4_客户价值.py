@@ -8,6 +8,7 @@ from app.components.layout import (
     render_insight,
     render_page_header,
 )
+from app.components.navigation import render_navigation
 from app.components.presentation import display_dataframe
 from app.Home import get_repository
 from src.visualization.charts import bubble_scatter_chart, ranked_bar_chart
@@ -19,6 +20,7 @@ def load_customer_value() -> pd.DataFrame:
 
 
 apply_dashboard_theme()
+render_navigation()
 render_page_header(
     "客户价值",
     "识别不同 RFM 分群的客户规模、消费贡献与购买阶段。",

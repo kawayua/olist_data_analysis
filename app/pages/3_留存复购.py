@@ -9,6 +9,7 @@ from app.components.layout import (
     render_insight,
     render_page_header,
 )
+from app.components.navigation import render_navigation
 from app.components.presentation import display_dataframe
 from app.Home import get_repository
 from src.visualization.charts import ranked_bar_chart, retention_heatmap
@@ -30,6 +31,7 @@ def load_repurchase_intervals() -> pd.DataFrame:
 
 
 apply_dashboard_theme()
+render_navigation()
 render_page_header(
     "留存与复购",
     "用月度 Cohort、30/60/90 天复购率与二购间隔识别持续购买的机会。",

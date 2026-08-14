@@ -10,6 +10,7 @@ from app.components.layout import (
     render_insight,
     render_page_header,
 )
+from app.components.navigation import render_navigation
 from app.components.presentation import display_dataframe
 from app.Home import get_repository
 from src.visualization.charts import bubble_scatter_chart, ranked_bar_chart
@@ -31,6 +32,7 @@ def load_delivery_rating_analysis() -> pd.DataFrame:
 
 
 apply_dashboard_theme()
+render_navigation()
 render_page_header(
     "商品与履约",
     "沿着商品、订单、配送与评分的链路定位体验风险。",
