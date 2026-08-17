@@ -1,0 +1,76 @@
+"""AST-based guardrails for read-only analytical SQL."""
+
+from __future__ import annotations
+
+import sqlglot
+from sqlglot import exp
+
+DEFAULT_LIMIT = 500
+MAX_LIMIT = 2_000
+
+
+class UnsafeQueryError(ValueError):
+    """Raised when a query exceeds the analytical read-only boundary."""
+
+
+def _raise_unsafe(message: str) -> None:
+    raise UnsafeQueryError(message)
+
+
+def _cte_names(expression: exp.Expression) -> set[str]:
+    return {
+        cte.alias_or_name.lower()
+        for cte in expression.find_all(exp.CTE)
+        if cte.alias_or_name
+    }
+
+
+def _validate_tables(expression: exp.Expression, allowed_views: set[str]) -> None:
+    cte_names = _cte_names(expression)
+    normalized_allowed_views = {view.lower() for view in allowed_views}
+
+    for table in expression.find_all(exp.Table):
+        if table.catalog or not table.db:
+            if table.name.lower() in cte_names and not table.catalog and not table.db:
+                continue
+            _raise_unsafe("query references a non-governed view")
+
+        qualified_name = f"{table.db}.{table.name}".lower()
+        if qualified_name not in normalized_allowed_views:
+            _raise_unsafe("query references a non-governed view")
+
+
+def _validated_limit(expression: exp.Select) -> None:
+    limit = expression.args.get("limit")
+    if limit is None:
+        expression.set("limit", exp.Limit(expression=exp.Literal.number(DEFAULT_LIMIT)))
+        return
+
+    value = limit.expression
+    if not isinstance(value, exp.Literal) or not value.is_int:
+        _raise_unsafe("query limit must be a positive integer")
+
+    limit_value = int(value.this)
+    if limit_value <= 0 or limit_value > MAX_LIMIT:
+        _raise_unsafe("query limit is outside the permitted range")
+
+
+def validate_read_only_sql(sql: str, allowed_views: set[str]) -> str:
+    """Return a normalized, bounded SELECT statement or raise ``UnsafeQueryError``."""
+    if not sql or not sql.strip():
+        _raise_unsafe("only one read-only SELECT statement is allowed")
+
+    try:
+        expressions = [
+            expression for expression in sqlglot.parse(sql, read="postgres") if expression
+        ]
+    except sqlglot.errors.ParseError:
+        _raise_unsafe("only one read-only SELECT statement is allowed")
+
+    if len(expressions) != 1 or not isinstance(expressions[0], exp.Select):
+        _raise_unsafe("only one read-only SELECT statement is allowed")
+
+    expression = expressions[0]
+    _validate_tables(expression, allowed_views)
+    _validated_limit(expression)
+    return expression.sql(dialect="postgres")
