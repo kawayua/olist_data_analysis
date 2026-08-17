@@ -101,7 +101,14 @@ class LangChainOpenAIClient:
             if role == "system":
                 converted.append(SystemMessage(content=content))
             elif role == "assistant":
-                converted.append(AIMessage(content=content))
+                converted.append(
+                    AIMessage(
+                        content=content,
+                        tool_calls=LangChainOpenAIClient._history_tool_calls(
+                            message.get("tool_calls", [])
+                        ),
+                    )
+                )
             elif role == "tool":
                 converted.append(
                     ToolMessage(
@@ -112,6 +119,35 @@ class LangChainOpenAIClient:
             else:
                 converted.append(HumanMessage(content=content))
         return converted
+
+    @staticmethod
+    def _history_tool_calls(raw_calls: Any) -> list[dict[str, Any]]:
+        if not isinstance(raw_calls, list):
+            raise TypeError("assistant tool calls must be a list")
+
+        calls: list[dict[str, Any]] = []
+        for raw_call in raw_calls:
+            if isinstance(raw_call, ToolCall):
+                call_id = raw_call.id
+                name = raw_call.name
+                arguments = raw_call.arguments
+            elif isinstance(raw_call, dict):
+                call_id = raw_call.get("id")
+                name = raw_call.get("name")
+                arguments = raw_call.get("args", raw_call.get("arguments"))
+            else:
+                raise TypeError("assistant tool call must be structured")
+
+            if (
+                not isinstance(call_id, str)
+                or not call_id
+                or not isinstance(name, str)
+                or not name
+                or not isinstance(arguments, dict)
+            ):
+                raise ValueError("assistant tool call is malformed")
+            calls.append({"id": call_id, "name": name, "args": arguments})
+        return calls
 
     @staticmethod
     def _text_content(content: Any) -> str:

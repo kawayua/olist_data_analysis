@@ -57,6 +57,52 @@ def test_client_normalizes_langchain_tool_calls_without_network():
     assert result.tool_calls[0].arguments == {"sql": "select 1"}
 
 
+def test_assistant_tool_history_keeps_call_association_for_tool_result():
+    converted = LangChainOpenAIClient._to_langchain_messages(
+        [
+            {
+                "role": "assistant",
+                "content": "我将查询。",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "name": "run_safe_sql",
+                        "args": {"sql": "select 1"},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_1",
+                "content": '{"rows": [{"value": 1}]}',
+            },
+        ]
+    )
+
+    assert converted[0].tool_calls[0]["id"] == "call_1"
+    assert converted[0].tool_calls[0]["name"] == "run_safe_sql"
+    assert converted[0].tool_calls[0]["args"] == {"sql": "select 1"}
+    assert converted[1].tool_call_id == "call_1"
+
+
+def test_malformed_assistant_tool_history_returns_safe_error():
+    client = LangChainOpenAIClient(runnable=FakeRunnable())
+
+    result = client.complete(
+        [
+            {
+                "role": "assistant",
+                "content": "我将查询。",
+                "tool_calls": [{"id": "call_1", "name": "run_safe_sql", "args": []}],
+            }
+        ],
+        [],
+    )
+
+    assert result.error == "LLM request failed"
+    assert result.tool_calls == []
+
+
 def test_injected_runnable_binds_governed_tool_schema_when_supported():
     runnable = ToolBindingFakeRunnable()
     client = LangChainOpenAIClient(runnable=runnable)
