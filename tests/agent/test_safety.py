@@ -13,6 +13,17 @@ def test_allowed_select_receives_default_limit():
     assert "LIMIT 500" in actual.upper()
 
 
+def test_allowed_union_all_receives_default_limit():
+    actual = validate_read_only_sql(
+        "select month_start from marts.monthly_growth "
+        "union all select customer_unique_id from marts.customer_360",
+        ALLOWED_VIEWS,
+    )
+
+    assert "UNION ALL" in actual.upper()
+    assert "LIMIT 500" in actual.upper()
+
+
 @pytest.mark.parametrize(
     "sql",
     [

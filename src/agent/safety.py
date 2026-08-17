@@ -50,7 +50,7 @@ def _validate_tables(expression: exp.Expression, allowed_views: set[str]) -> Non
             _raise_unsafe("query references a non-governed view")
 
 
-def _validated_limit(expression: exp.Select) -> None:
+def _validated_limit(expression: exp.Select | exp.SetOperation) -> None:
     limit = expression.args.get("limit")
     if limit is None:
         expression.set("limit", exp.Limit(expression=exp.Literal.number(DEFAULT_LIMIT)))
@@ -77,7 +77,9 @@ def validate_read_only_sql(sql: str, allowed_views: set[str]) -> str:
     except sqlglot.errors.ParseError:
         _raise_unsafe("only one read-only SELECT statement is allowed")
 
-    if len(expressions) != 1 or not isinstance(expressions[0], exp.Select):
+    if len(expressions) != 1 or not isinstance(
+        expressions[0], (exp.Select, exp.SetOperation)
+    ):
         _raise_unsafe("only one read-only SELECT statement is allowed")
 
     expression = expressions[0]
