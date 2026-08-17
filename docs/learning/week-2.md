@@ -79,3 +79,55 @@ Dashboard 的筛选器必须和查询数据集市的粒度一致。月度增长�
 利润最大化与 ROI 最大化不是同一目标。小预算方案可能因分母较小而得到更高 ROI，但只创造较少的绝对增量利润；在预算、单次触达成本和最大触达比例约束下，默认建议应优先选择净增量利润最高的可执行方案，ROI 只作为资金效率的辅助视角。
 
 模型给出的是复购关联概率，不是“发放营销触达会造成多少复购”的因果效果。保守、基准和乐观 uplift 都是待验证的业务假设；需要在可比人群中随机分配触达组与对照组，用 A/B 测试估计增量复购与不确定性，再用实验结果更新模拟参数。
+
+## Day 18：为自然语言分析 Agent 建立“能用但不能越权”的工具边界
+
+Day 18 的目标不是立即做出一个会多轮对话的 Agent，而是先解决一个更基础的问题：将来模型即使把 SQL 或工具参数生成错了，系统怎样仍能阻止它越权访问、写入数据库、泄露密钥，或一次返回过大的结果。Day 19 才会把模型、工具调用循环、审计记录和问答页面串起来；本日只交付一个可单独测试的安全地基。这个拆分很重要，因为“模型会不会说得通”和“系统会不会安全执行”是两种不同能力，后者不能交给提示词来保证。
+
+### 为什么采用 LangChain 混合结构，而不直接让模型连接数据库
+
+本项目使用 `langchain-core` 与 `langchain-openai` 对接 OpenAI-compatible 模型服务。`LangChainOpenAIClient` 读取统一的 `Settings`，在真正调用时构造 `ChatOpenAI`，并将项目自己的 `ToolDefinition` 转为 LangChain function schema；模型返回的文本和工具调用再被标准化为 `LLMResponse(text, tool_calls, error)`。这样做的好处是：以后更换模型服务只需调整配置，Day 19 的 Agent 也能沿用成熟的消息和工具调用协议。
+
+但 LangChain 只负责“模型如何提出工具调用”，绝不负责“模型可以执行什么”。没有使用 LangChain SQL Agent、SQL Database 或自动 SQL 执行链，因为它们会让模型得到过宽的查询能力，也会把 mart 白名单、行数限制和项目的审计边界藏在框架内部。实际结构是：模型提出请求 → `AnalysisTools` 接收一个明确工具名和 JSON 参数 → 项目安全层验证 → 受控执行器执行 → 结构化结果回给上层。模型永远没有数据库连接对象，也不能自行决定执行器。
+
+### 配置、密钥与“测试不联网”原则
+
+本地 `.env` 用于保存 `LLM_BASE_URL`、`LLM_API_KEY` 和 `LLM_MODEL`；`.gitignore` 已忽略 `.env`，因此真实 Key 不会被纳入 Git。提交到仓库的 `.env.example` 只保留可复现的字段和空值模板，使用者复制为 `.env` 后自行填写。数据库已有的开发连接字段也保留在示例中，但生产中仍应改用独立的最小权限只读账号。
+
+客户端构造本身不联网。只有 `complete(...)` 在 API Key 和模型名都存在时才会尝试请求服务；如果未配置，它返回固定的 `LLM is not configured` 错误，而不是创建客户端或发送请求。测试通过注入 fake runnable：它模拟 `invoke` 的模型响应和 `bind_tools` 的绑定结果，所以测试既不需要 API Key，也不产生网络流量或调用成本。外部服务异常、畸形工具历史或无法解析的模型响应统一变为 `LLM request failed`，不把连接串、密钥或原始异常透传到页面。
+
+一个容易忽略的细节是多轮工具调用的关联。助手消息中的每个调用都保存 `id`、`name` 和 `args`，后续 `ToolMessage` 用同一个 `tool_call_id` 关联结果。若调用参数不是结构化字典，客户端直接安全失败。这样 Day 19 在保存会话历史时能知道“这份工具结果对应哪一次调用”，而不是把上一轮的结果错误地配给下一轮。
+
+### SQL 的第一道防线：解析 AST，而不是搜索危险关键词
+
+`validate_read_only_sql(sql, allowed_views)` 是所有 SQL 执行前的必经入口。它用 `sqlglot` 将 PostgreSQL SQL 解析为抽象语法树（AST），再检查节点类型；这比查找 `delete`、`drop` 等字符串可靠得多。例如关键字可以出现在注释、字符串或复杂嵌套结构中，简单黑名单很容易漏掉真正的写入语句，也容易误伤合法查询。
+
+校验规则包括：只能有一条语句，根节点只能是 `SELECT` 或只读集合运算（如 `UNION ALL`）；任何 DML、DDL、命令和事务节点都拒绝；`SELECT INTO` 和 `FOR UPDATE` 也拒绝，因为前者会创建对象、后者会加锁。每一个真实表都必须完整写成白名单中的 `marts.视图名`，不能访问 `raw`、`staging`、`warehouse`、未知 marts、无 schema 表或跨 catalog 表。CTE 是例外：同一条查询内部定义的 CTE 别名不是数据库表，因此允许在后续查询中引用；但 CTE 内部的真实表仍会被逐一验证，不能借 CTE 隐藏 `raw.orders` 或 `DELETE ... RETURNING`。
+
+行数限制也在 AST 的所有层级检查：没有外层限制时系统自动加 `LIMIT 500`；任何 `LIMIT` 必须是正整数，且不能超过 2,000。特别测试了两种常见绕过方式：在 CTE 内写 `LIMIT 2001`，以及在 `UNION ALL` 的某一个子查询内写超限 `LIMIT`。两种都会被拒绝，而不是只检查最外层的 `LIMIT`。这解释了“安全校验要递归遍历整棵语法树”的原因：攻击和误用往往发生在嵌套层，不在最外层。
+
+被拒绝时只抛出不含原 SQL、连接串或凭据的 `UnsafeQueryError`。例如测试故意在注释中放入 PostgreSQL URL，错误文本也不含这段内容。安全报错应告诉用户“越权查询不允许”，但不应把可被利用的数据库信息带到日志或模型上下文。
+
+### SQL 的第二道防线：数据库只读事务与超时
+
+即使 AST 校验正确，也不能只依赖应用层，因此 `SQLAlchemyReadOnlyExecutor` 是第二道独立边界。它在短事务内依次执行 `SET TRANSACTION READ ONLY` 和 `SET LOCAL statement_timeout = '5000ms'`，再执行已经验证过的查询，并在 DataFrame 返回前再次截断为最多 2,000 行。前两条设置分别防止事务写入和防止慢查询长时间占用数据库；最后的 DataFrame 截断则避免下游序列化、图表或模型上下文接收过大的结果。
+
+真正的生产防线还应包含数据库账号权限：应用使用的 Agent 账号仅授予所需 marts 的 `SELECT`，不授予 raw/staging/warehouse、建表或写入权限。代码中的只读事务是纵深防御，不是替代数据库权限；如果未来有人错误修改了应用校验，最小权限账号仍能阻断实际写操作。
+
+### 五个受控工具及各自的输入输出边界
+
+`AnalysisTools` 是 Day 18 唯一的工具注册表，准确暴露五个工具：`get_metric_definition`、`run_safe_sql`、`create_chart`、`predict_repurchase` 和 `simulate_campaign`。工具数量和 schema 都有测试，避免 Day 19 接入时意外多出未审查的能力。
+
+- `get_metric_definition` 只读取已有的指标契约，保证 Agent 回答 GMV、订单数或复购率时先使用项目统一口径，而不是临时编造公式。
+- `run_safe_sql` 先执行 AST 校验，只有通过后才调用注入的只读 executor，并以 ISO 日期、普通数值和 `null` 的 JSON 安全格式返回不超过 2,000 行的记录。非法 SQL 在到达 executor 前就会被拒绝。
+- `create_chart` 只接受 `bar`、`line`、`scatter` 三种图形和显式 `data/x/y` 字段，不接收 Python、JavaScript 或任意图表表达式；数据最多 2,000 行，并要求 x、y 确实存在于传入字段中。
+- `predict_repurchase` 只把 Day 14–16 定义的六个首购时点特征传给已保存并校准的模型。即使请求中混入 `repurchased_within_90d` 等标签字段，也不会传进模型，从接口层继续维护防标签泄漏的训练边界；返回值必须落在 0 到 1 的概率区间。
+- `simulate_campaign` 复用 Day 17 的增量利润模拟器。它只接受显式预算、触达成本、客单收入、概率、情景和最大触达比例，输入情景必须恰好是 `name` 与有限数值 `uplift_rate`；概率和情景数组均限 2,000 项，结果序列化为可审计的增量收入、成本、净增量利润与 ROI，而不是把自然复购收入误当成营销收益。
+
+这里“JSON 边界”同样是一种工程安全性：DataFrame 可能含 `Timestamp`、`date`、带时区 `datetime`、`Decimal`、`NaN`、`NaT` 等 Python 对象，不能直接交给模型或网页。工具将它们统一序列化为 ISO 时间、数字和 JSON `null`，保证 API 边界稳定，也防止页面在正确查询后因序列化失败而崩溃。
+
+### 本日验证与得到的结论
+
+Day 18 的测试刻意不依赖真实数据库或模型。测试覆盖了合法白名单 SELECT 自动补限制、集合查询、嵌套/CTE 限制、DML/DDL/多语句/越权表/无 schema/锁语句拒绝、错误脱敏、只读事务与 5 秒超时、2,000 行截断、日期和 Decimal 的 JSON 序列化、五工具 schema、图表与营销输入上限、特征白名单，以及 fake LangChain 客户端的工具绑定、消息关联和安全失败行为。
+
+最终复验使用 `py -3.13 -m pytest tests/agent -v --basetemp "$env:TEMP\\day18-final"`、`py -3.13 -m ruff check src/agent tests/agent`、`git check-ignore -v .env`、`git ls-files .env .env.example` 和 `git diff --check`。这些命令分别验证功能、安全边界、风格、真实 `.env` 不会入库、示例配置的受控提交状态以及补丁没有空白错误。通过它们只说明 Day 18 的“模型与工具边界”满足预期；它不代表模型已经具备可靠业务推理能力，也不代表营销模拟的 uplift 已被因果实验验证。下一步 Day 19 要在这些限制之上实现有上限的工具调用循环、请求/工具审计轨迹、评测问题集和 Streamlit 问答体验。
