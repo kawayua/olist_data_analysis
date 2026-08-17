@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import asdict
+from math import isfinite
+from numbers import Real
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -101,6 +103,8 @@ class AnalysisTools:
             raise ValueError("unsupported chart type")
         if not isinstance(x, str) or not isinstance(y, str):
             raise TypeError("chart field names must be strings")
+        if len(data) > 2_000:
+            raise ValueError("chart data cannot exceed 2,000 records")
         frame = pd.DataFrame(data)
         if x not in frame.columns or y not in frame.columns:
             raise ValueError("requested chart field is not present in data")
@@ -134,18 +138,19 @@ class AnalysisTools:
         budget: float,
         contact_cost: float,
         average_repurchase_revenue: float,
-        scenarios: Sequence[Scenario],
+        scenarios: Sequence[Scenario | dict[str, Any]],
         max_contact_fraction: float,
     ) -> list[dict[str, float | int | str]]:
         """Run the existing incremental-profit simulator with explicit inputs."""
-        if not all(isinstance(scenario, Scenario) for scenario in scenarios):
-            raise TypeError("scenarios must contain explicit Scenario values")
+        normalized_scenarios = tuple(
+            _normalize_scenario(scenario) for scenario in scenarios
+        )
         results = self._campaign_simulator(
             pd.Series(probabilities, dtype=float),
             budget,
             contact_cost,
             average_repurchase_revenue,
-            tuple(scenarios),
+            normalized_scenarios,
             max_contact_fraction,
         )
         return [asdict(result) for result in results]
@@ -169,7 +174,11 @@ class AnalysisTools:
                 _object_schema(
                     {
                         "chart_type": {"type": "string", "enum": ["bar", "line", "scatter"]},
-                        "data": {"type": "array", "items": {"type": "object"}},
+                        "data": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                            "maxItems": 2_000,
+                        },
                         "x": {"type": "string"},
                         "y": {"type": "string"},
                     },
@@ -210,3 +219,22 @@ def _object_schema(
     properties: dict[str, dict[str, Any]], required: list[str]
 ) -> dict[str, Any]:
     return {"type": "object", "properties": properties, "required": required}
+
+
+def _normalize_scenario(value: Scenario | dict[str, Any]) -> Scenario:
+    """Convert one JSON tool argument into the project's explicit Scenario type."""
+    if isinstance(value, Scenario):
+        return value
+    if not isinstance(value, dict) or set(value) != {"name", "uplift_rate"}:
+        raise ValueError("scenario must contain only name and uplift_rate")
+    name = value["name"]
+    uplift_rate = value["uplift_rate"]
+    if not isinstance(name, str) or not name:
+        raise ValueError("scenario name must be a non-empty string")
+    if (
+        isinstance(uplift_rate, bool)
+        or not isinstance(uplift_rate, Real)
+        or not isfinite(uplift_rate)
+    ):
+        raise ValueError("scenario uplift_rate must be a finite number")
+    return Scenario(name=name, uplift_rate=float(uplift_rate))

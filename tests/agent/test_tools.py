@@ -145,6 +145,64 @@ def test_campaign_simulation_serializes_incremental_profit():
     assert result[0]["net_incremental_profit"] == 55.0
 
 
+def test_campaign_simulation_accepts_json_scenario_payloads():
+    observed: list[Scenario] = []
+
+    def fake_simulator(*args: object, **_kwargs: object) -> list[SimulationResult]:
+        observed.extend(args[4])
+        return []
+
+    tools = AnalysisTools(
+        executor=FakeExecutor(),
+        allowed_views={"marts.monthly_growth"},
+        campaign_simulator=fake_simulator,
+    )
+
+    assert tools.simulate_campaign(
+        probabilities=[0.4],
+        budget=10.0,
+        contact_cost=10.0,
+        average_repurchase_revenue=150.0,
+        scenarios=[{"name": "baseline", "uplift_rate": 0.1}],
+        max_contact_fraction=1.0,
+    ) == []
+    assert observed == [Scenario("baseline", 0.1)]
+
+
+@pytest.mark.parametrize(
+    "scenarios",
+    [
+        [{"name": "baseline"}],
+        [{"name": "baseline", "uplift_rate": 0.1, "extra": "no"}],
+        ["baseline"],
+    ],
+)
+def test_campaign_simulation_rejects_malformed_json_scenarios(scenarios):
+    tools = AnalysisTools(
+        executor=FakeExecutor(), allowed_views={"marts.monthly_growth"}
+    )
+
+    with pytest.raises((TypeError, ValueError), match="scenario"):
+        tools.simulate_campaign(
+            probabilities=[0.4],
+            budget=10.0,
+            contact_cost=10.0,
+            average_repurchase_revenue=150.0,
+            scenarios=scenarios,
+            max_contact_fraction=1.0,
+        )
+
+
+def test_chart_rejects_more_than_two_thousand_records():
+    tools = AnalysisTools(
+        executor=FakeExecutor(), allowed_views={"marts.monthly_growth"}
+    )
+    data = [{"month": str(index), "revenue": float(index)} for index in range(2_001)]
+
+    with pytest.raises(ValueError, match="2,000"):
+        tools.create_chart("bar", data, "month", "revenue")
+
+
 def test_sqlalchemy_executor_sets_read_only_timeout_and_row_cap(monkeypatch):
     commands: list[str] = []
 
