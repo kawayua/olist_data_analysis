@@ -1,3 +1,6 @@
+from datetime import UTC, date, datetime
+from decimal import Decimal
+
 import pandas as pd
 import pytest
 
@@ -28,6 +31,38 @@ def test_safe_sql_uses_validated_query_and_returns_bounded_records():
 
     assert "LIMIT 500" in executor.sql.upper()
     assert result["rows"] == [{"month_start": "2017-01-01", "item_revenue": 100.0}]
+
+
+def test_safe_sql_serializes_dates_decimals_and_missing_values_for_json():
+    class TypedFakeExecutor:
+        def read_only_query(self, _sql: str) -> pd.DataFrame:
+            return pd.DataFrame(
+                [
+                    {
+                        "timestamp": pd.Timestamp("2018-01-02 03:04:05"),
+                        "date": date(2018, 1, 3),
+                        "datetime": datetime(2018, 1, 4, 5, 6, 7, tzinfo=UTC),
+                        "amount": Decimal("12.50"),
+                        "missing": float("nan"),
+                        "missing_time": pd.NaT,
+                    }
+                ]
+            )
+
+    result = AnalysisTools(
+        executor=TypedFakeExecutor(), allowed_views={"marts.monthly_growth"}
+    ).run_safe_sql("select * from marts.monthly_growth")
+
+    assert result["rows"] == [
+        {
+            "timestamp": "2018-01-02T03:04:05.000",
+            "date": "2018-01-03T00:00:00.000",
+            "datetime": "2018-01-04T05:06:07.000Z",
+            "amount": 12.5,
+            "missing": None,
+            "missing_time": None,
+        }
+    ]
 
 
 def test_unsafe_sql_never_reaches_the_executor():
@@ -201,6 +236,23 @@ def test_chart_rejects_more_than_two_thousand_records():
 
     with pytest.raises(ValueError, match="2,000"):
         tools.create_chart("bar", data, "month", "revenue")
+
+
+def test_campaign_simulation_rejects_more_than_two_thousand_payload_entries():
+    tools = AnalysisTools(
+        executor=FakeExecutor(), allowed_views={"marts.monthly_growth"}
+    )
+    scenarios = [{"name": str(index), "uplift_rate": 0.1} for index in range(2_001)]
+
+    with pytest.raises(ValueError, match="2,000"):
+        tools.simulate_campaign(
+            probabilities=[0.1] * 2_001,
+            budget=10.0,
+            contact_cost=10.0,
+            average_repurchase_revenue=150.0,
+            scenarios=scenarios,
+            max_contact_fraction=1.0,
+        )
 
 
 def test_sqlalchemy_executor_sets_read_only_timeout_and_row_cap(monkeypatch):

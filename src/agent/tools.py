@@ -84,7 +84,7 @@ class AnalysisTools:
         frame = self._executor.read_only_query(normalized_sql)
         return {
             "sql": normalized_sql,
-            "rows": frame.head(2_000).to_dict(orient="records"),
+            "rows": _json_safe_records(frame.head(2_000)),
         }
 
     def get_metric_definition(self, name: str) -> dict[str, str]:
@@ -142,6 +142,8 @@ class AnalysisTools:
         max_contact_fraction: float,
     ) -> list[dict[str, float | int | str]]:
         """Run the existing incremental-profit simulator with explicit inputs."""
+        if len(probabilities) > 2_000 or len(scenarios) > 2_000:
+            raise ValueError("campaign payload cannot exceed 2,000 entries")
         normalized_scenarios = tuple(
             _normalize_scenario(scenario) for scenario in scenarios
         )
@@ -195,11 +197,19 @@ class AnalysisTools:
                 "Simulate incremental marketing profit under explicit scenarios.",
                 _object_schema(
                     {
-                        "probabilities": {"type": "array", "items": {"type": "number"}},
+                        "probabilities": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "maxItems": 2_000,
+                        },
                         "budget": {"type": "number"},
                         "contact_cost": {"type": "number"},
                         "average_repurchase_revenue": {"type": "number"},
-                        "scenarios": {"type": "array", "items": {"type": "object"}},
+                        "scenarios": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                            "maxItems": 2_000,
+                        },
                         "max_contact_fraction": {"type": "number"},
                     },
                     [
@@ -219,6 +229,11 @@ def _object_schema(
     properties: dict[str, dict[str, Any]], required: list[str]
 ) -> dict[str, Any]:
     return {"type": "object", "properties": properties, "required": required}
+
+
+def _json_safe_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
+    """Serialize DataFrame records so an agent result can always become JSON."""
+    return json.loads(frame.to_json(orient="records", date_format="iso"))
 
 
 def _normalize_scenario(value: Scenario | dict[str, Any]) -> Scenario:
