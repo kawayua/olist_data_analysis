@@ -68,18 +68,19 @@ class LangChainOpenAIClient:
 
         try:
             runnable = self._runnable or self._build_runnable()
-            if self._runnable is None and tools:
+            if tools and hasattr(runnable, "bind_tools"):
                 runnable = runnable.bind_tools(
                     [tool.as_langchain_schema() for tool in tools]
                 )
             response = runnable.invoke(self._to_langchain_messages(messages))
+            return LLMResponse(
+                text=self._text_content(getattr(response, "content", "")),
+                tool_calls=self._normalize_tool_calls(
+                    getattr(response, "tool_calls", [])
+                ),
+            )
         except Exception:  # noqa: BLE001 - external model errors must not expose secrets.
             return LLMResponse(text="", tool_calls=[], error="LLM request failed")
-
-        return LLMResponse(
-            text=self._text_content(getattr(response, "content", "")),
-            tool_calls=self._normalize_tool_calls(getattr(response, "tool_calls", [])),
-        )
 
     def _is_configured(self) -> bool:
         return bool(self._settings.llm_api_key and self._settings.llm_model)
