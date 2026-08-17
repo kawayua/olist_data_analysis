@@ -25,6 +25,9 @@ def test_allowed_select_receives_default_limit():
         "select * from marts.monthly_growth limit 2001",
         "select * from marts.monthly_growth limit '500'",
         "with safe as (select * from marts.customer_360), unsafe as (select * from raw.orders) select * from safe",
+        "with removed as (delete from marts.customer_360 returning *) select * from removed",
+        "select * into marts.exported_growth from marts.monthly_growth",
+        "select * from marts.monthly_growth for update",
     ],
 )
 def test_unsafe_or_unbounded_sql_is_rejected(sql):

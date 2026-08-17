@@ -25,6 +25,16 @@ def _cte_names(expression: exp.Expression) -> set[str]:
     }
 
 
+def _validate_read_only_nodes(expression: exp.Expression) -> None:
+    mutating_node_types = (exp.DML, exp.DDL, exp.Command, exp.Transaction)
+    if any(isinstance(node, mutating_node_types) for node in expression.walk()):
+        _raise_unsafe("only one read-only SELECT statement is allowed")
+
+    for select in expression.find_all(exp.Select):
+        if select.args.get("into") or select.args.get("locks"):
+            _raise_unsafe("only one read-only SELECT statement is allowed")
+
+
 def _validate_tables(expression: exp.Expression, allowed_views: set[str]) -> None:
     cte_names = _cte_names(expression)
     normalized_allowed_views = {view.lower() for view in allowed_views}
@@ -71,6 +81,7 @@ def validate_read_only_sql(sql: str, allowed_views: set[str]) -> str:
         _raise_unsafe("only one read-only SELECT statement is allowed")
 
     expression = expressions[0]
+    _validate_read_only_nodes(expression)
     _validate_tables(expression, allowed_views)
     _validated_limit(expression)
     return expression.sql(dialect="postgres")
