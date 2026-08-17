@@ -27,6 +27,24 @@ def test_allowed_union_all_receives_default_limit():
 @pytest.mark.parametrize(
     "sql",
     [
+        (
+            "with oversized as (select * from marts.monthly_growth limit 2001) "
+            "select * from oversized"
+        ),
+        (
+            "(select * from marts.monthly_growth limit 2001) union all "
+            "(select * from marts.customer_360)"
+        ),
+    ],
+)
+def test_nested_or_set_operand_limit_cannot_bypass_cap(sql):
+    with pytest.raises(UnsafeQueryError):
+        validate_read_only_sql(sql, ALLOWED_VIEWS)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
         "delete from marts.monthly_growth",
         "create table marts.bad as select * from marts.monthly_growth",
         "select 1; drop table warehouse.fact_orders",

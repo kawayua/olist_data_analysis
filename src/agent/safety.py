@@ -50,12 +50,7 @@ def _validate_tables(expression: exp.Expression, allowed_views: set[str]) -> Non
             _raise_unsafe("query references a non-governed view")
 
 
-def _validated_limit(expression: exp.Select | exp.SetOperation) -> None:
-    limit = expression.args.get("limit")
-    if limit is None:
-        expression.set("limit", exp.Limit(expression=exp.Literal.number(DEFAULT_LIMIT)))
-        return
-
+def _validate_limit_value(limit: exp.Limit) -> None:
     value = limit.expression
     if not isinstance(value, exp.Literal) or not value.is_int:
         _raise_unsafe("query limit must be a positive integer")
@@ -63,6 +58,14 @@ def _validated_limit(expression: exp.Select | exp.SetOperation) -> None:
     limit_value = int(value.this)
     if limit_value <= 0 or limit_value > MAX_LIMIT:
         _raise_unsafe("query limit is outside the permitted range")
+
+
+def _validated_limit(expression: exp.Select | exp.SetOperation) -> None:
+    for limit in expression.find_all(exp.Limit):
+        _validate_limit_value(limit)
+
+    if expression.args.get("limit") is None:
+        expression.set("limit", exp.Limit(expression=exp.Literal.number(DEFAULT_LIMIT)))
 
 
 def validate_read_only_sql(sql: str, allowed_views: set[str]) -> str:
