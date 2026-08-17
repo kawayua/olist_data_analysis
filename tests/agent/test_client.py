@@ -1,3 +1,5 @@
+import pytest
+
 from src.agent.client import LangChainOpenAIClient, ToolDefinition
 from src.config import Settings
 
@@ -42,6 +44,20 @@ class MalformedMessage:
 class MalformedResponseRunnable:
     def invoke(self, messages):
         return MalformedMessage()
+
+
+class InvalidToolCallMessage:
+    def __init__(self, tool_call):
+        self.content = "tool call"
+        self.tool_calls = [tool_call]
+
+
+class InvalidToolCallRunnable:
+    def __init__(self, tool_call):
+        self._tool_call = tool_call
+
+    def invoke(self, messages):
+        return InvalidToolCallMessage(self._tool_call)
 
 
 def test_client_normalizes_langchain_tool_calls_without_network():
@@ -133,6 +149,36 @@ def test_malformed_model_response_returns_safe_error():
     assert result.error == "LLM request failed"
     assert result.text == ""
     assert result.tool_calls == []
+
+
+def test_invalid_model_tool_call_returns_safe_error():
+    client = LangChainOpenAIClient(
+        runnable=InvalidToolCallRunnable(
+            {"id": "", "name": "run_safe_sql", "args": {"sql": "select 1"}}
+        )
+    )
+
+    result = client.complete([{"role": "user", "content": "query"}], [])
+
+    assert result.error == "LLM request failed"
+    assert result.text == ""
+    assert result.tool_calls == []
+
+
+@pytest.mark.parametrize(
+    "tool_call",
+    [
+        {"id": "call_1", "name": "", "args": {}},
+        {"id": "call_1", "name": 42, "args": {}},
+        {"id": "call_1", "name": "run_safe_sql", "args": []},
+    ],
+)
+def test_other_invalid_model_tool_call_fields_return_safe_error(tool_call):
+    client = LangChainOpenAIClient(runnable=InvalidToolCallRunnable(tool_call))
+
+    result = client.complete([{"role": "user", "content": "query"}], [])
+
+    assert result.error == "LLM request failed"
 
 
 def test_unconfigured_client_returns_error_without_constructing_a_runnable(monkeypatch):

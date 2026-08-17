@@ -24,6 +24,33 @@ def test_allowed_union_all_receives_default_limit():
     assert "LIMIT 500" in actual.upper()
 
 
+def test_standard_analytical_aggregate_and_scalar_functions_are_allowed():
+    actual = validate_read_only_sql(
+        "select date_trunc('month', month_start), count(*), "
+        "round(avg(order_count), 2), coalesce(max(revenue), 0) "
+        "from marts.monthly_growth group by 1",
+        ALLOWED_VIEWS,
+    )
+
+    assert "COUNT(*)" in actual.upper()
+    assert "COALESCE" in actual.upper()
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "select pg_sleep(4) from marts.monthly_growth limit 1",
+        "select current_user",
+        "select current_database() from marts.monthly_growth",
+        "select random() from marts.monthly_growth",
+        "select * from generate_series(1, 10)",
+    ],
+)
+def test_system_dangerous_or_table_valued_functions_are_rejected(sql):
+    with pytest.raises(UnsafeQueryError):
+        validate_read_only_sql(sql, ALLOWED_VIEWS)
+
+
 @pytest.mark.parametrize(
     "sql",
     [

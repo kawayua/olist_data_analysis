@@ -162,17 +162,29 @@ class LangChainOpenAIClient:
 
     @staticmethod
     def _normalize_tool_calls(raw_calls: Any) -> list[ToolCall]:
+        if raw_calls is None:
+            return []
+        if not isinstance(raw_calls, list):
+            raise TypeError("model tool calls must be a list")
+
         calls: list[ToolCall] = []
-        for raw_call in raw_calls or []:
+        for raw_call in raw_calls:
             if not isinstance(raw_call, dict):
-                continue
+                raise TypeError("model tool call must be structured")
+            call_id = raw_call.get("id")
             name = raw_call.get("name")
             arguments = raw_call.get("args", raw_call.get("arguments", {}))
-            if not isinstance(name, str) or not isinstance(arguments, dict):
-                continue
+            if (
+                not isinstance(call_id, str)
+                or not call_id.strip()
+                or not isinstance(name, str)
+                or not name.strip()
+                or not isinstance(arguments, dict)
+            ):
+                raise ValueError("model tool call is malformed")
             calls.append(
                 ToolCall(
-                    id=str(raw_call.get("id", "")),
+                    id=call_id,
                     name=name,
                     arguments=arguments,
                 )
