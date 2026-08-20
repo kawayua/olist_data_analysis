@@ -16,6 +16,8 @@ from langchain_openai import ChatOpenAI
 
 from src.config import Settings, get_settings
 
+MODEL_REQUEST_TIMEOUT_SECONDS = 30
+
 
 @dataclass(frozen=True)
 class ToolDefinition:
@@ -90,6 +92,8 @@ class LangChainOpenAIClient:
             api_key=self._settings.llm_api_key,
             base_url=self._settings.llm_base_url,
             model=self._settings.llm_model,
+            timeout=MODEL_REQUEST_TIMEOUT_SECONDS,
+            max_retries=0,
         )
 
     @staticmethod

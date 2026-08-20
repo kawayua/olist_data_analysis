@@ -1,5 +1,6 @@
 import pytest
 
+import src.agent.client as client_module
 from src.agent.client import LangChainOpenAIClient, ToolDefinition
 from src.config import Settings
 
@@ -193,3 +194,21 @@ def test_unconfigured_client_returns_error_without_constructing_a_runnable(monke
 
     assert result.error == "LLM is not configured"
     assert result.tool_calls == []
+
+
+def test_client_constructs_model_with_bounded_timeout_and_no_retry(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def capture_model(**kwargs):
+        captured.update(kwargs)
+        return FakeRunnable()
+
+    monkeypatch.setattr(client_module, "ChatOpenAI", capture_model)
+    client = LangChainOpenAIClient(
+        Settings(llm_api_key="key", llm_base_url="https://example.test/v1", llm_model="test")
+    )
+
+    client._build_runnable()
+
+    assert captured["timeout"] == 30
+    assert captured["max_retries"] == 0
