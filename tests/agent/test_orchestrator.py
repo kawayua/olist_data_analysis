@@ -10,6 +10,7 @@ import pytest
 
 from src.agent.client import LLMResponse, ToolCall, ToolDefinition
 from src.agent.orchestrator import AnalysisAgent
+from src.agent.safety import UnsafeQueryError
 
 
 @dataclass
@@ -66,6 +67,38 @@ def test_agent_executes_registered_tools_and_returns_audit_fields():
         "definition": "已送达订单商品金额之和",
     }
     assert answer.tool_trace[0].status == "success"
+
+
+def test_agent_gives_model_safe_correction_hints_for_metric_and_sql_failures():
+    class CorrectableTools(MultiFakeTools):
+        def get_metric_definition(self, name: str) -> dict[str, str]:
+            raise KeyError(name)
+
+        def run_safe_sql(self, sql: str) -> dict[str, Any]:
+            raise UnsafeQueryError("private rejected query text")
+
+    client = ScriptedClient(
+        [
+            LLMResponse("", [_call("m1", "get_metric_definition", {"name": "sales"})]),
+            LLMResponse("", [_call("s1", "run_safe_sql", {"sql": "bad sql"})]),
+            LLMResponse("已说明限制", []),
+        ]
+    )
+
+    answer = AnalysisAgent(client, CorrectableTools()).run("哪个州销售额最高？")
+
+    tool_messages = {
+        message["tool_call_id"]: message
+        for batch in client.seen_messages[1:]
+        for message in batch
+        if message["role"] == "tool"
+    }
+    assert json.loads(tool_messages["m1"]["content"])["error"] == "metric_not_found"
+    assert json.loads(tool_messages["s1"]["content"])["error"] == "query_rejected"
+    assert "private rejected" not in json.dumps(tool_messages, ensure_ascii=False)
+    assert answer.answer == "已说明限制"
+    assert "item_revenue" in client.seen_messages[0][0]["content"]
+    assert "marts.state_performance" in client.seen_messages[0][0]["content"]
 
 
 def _definition(name: str) -> ToolDefinition:

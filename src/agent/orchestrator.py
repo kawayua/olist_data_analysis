@@ -11,6 +11,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from src.agent.client import LLMResponse, ToolCall, ToolDefinition
+from src.agent.safety import UnsafeQueryError
 
 
 class _StrictArguments(BaseModel):
@@ -110,6 +111,11 @@ class AnalysisAgent:
                 "role": "system",
                 "content": (
                     "你是受控数据分析助手。只使用已注册工具；结论须说明证据和限制。"
+                    "指标名称仅可使用：gmv、item_revenue、orders、customers、"
+                    "item_revenue_aov、new_customers、returning_customers、"
+                    "repeat_rate_30d、repeat_rate_60d、repeat_rate_90d、late_delivery_rate。"
+                    "州维度销售额使用 marts.state_performance 的 customer_state 与 item_revenue；"
+                    "先取得一次受控查询结果，再直接给出结论，不要重复相同调用。"
                 ),
             },
             {"role": "user", "content": question},
@@ -192,6 +198,10 @@ class AnalysisAgent:
             method = getattr(self._tools, call.name)
             raw_result = method(**arguments.model_dump())
             result = raw_result if isinstance(raw_result, dict) else {"result": raw_result}
+        except KeyError:
+            return self._failure_trace(call, started, started_at, "metric_not_found")
+        except UnsafeQueryError:
+            return self._failure_trace(call, started, started_at, "query_rejected")
         except Exception:  # noqa: BLE001 - tool internals must not leak to the model.
             return self._failure_trace(
                 call, started, started_at, "tool_execution_failed"
