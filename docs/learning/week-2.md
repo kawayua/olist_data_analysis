@@ -179,3 +179,15 @@ git diff --check
 第一条验证 Agent 状态机、评测逻辑、页面演示与既有可视化没有回归；第二条生成可审阅的离线评测产物；Ruff 检查风格；`git check-ignore -v .env` 确认真实密钥文件继续被忽略；最后一条检查补丁没有空白问题。真正使用时先复制 `.env.example` 为 `.env`，填写 `LLM_BASE_URL`、`LLM_API_KEY` 和 `LLM_MODEL`，再启动 Streamlit；若准备 live 评测，还应先确定预算、超时、模型版本和结果记录方式。
 
 Day 19 的交付说明“Agent 能在严格边界内调用工具并留下证据”，不说明自然语言回答天然正确，更不说明预测概率或营销 uplift 具有因果含义。下一阶段应进一步做部署/体验收口，并把真实模型的黄金集结果、失败案例和人工复核流程纳入最终项目报告。
+
+### 真实运行复盘：为什么“哪个州的销售额最好”会耗尽六步
+
+在配置真实模型后，问题“这些月里哪一个州的销售额最好？”首次没有得到业务结论，而是返回“分析未在允许步数内完成”。这条提示不是数据库连接失败，也不是 API Key 无效；它是 `AnalysisAgent` 在已经执行满六次工具调用、模型仍未输出最终文本时给出的安全停止结果。六步上限仍然是正确的保护，防止模型在错误路径上无限消耗调用次数；真正需要修复的是模型为什么没有得到可行动的反馈。
+
+页面轨迹给出了诊断证据：四次 `run_safe_sql` 均是 `tool_execution_failed`，另两次 `get_metric_definition` 分别请求了不存在的 `sales` 与 `sales_by_state`。项目真实的受控指标名是 `item_revenue`（商品销售额），而州维度结果位于 `marts.state_performance`，对应字段是 `customer_state` 与 `item_revenue`。模型并不知道这些命名，便用日常语言中的 sales 进行猜测；更严重的是，原循环把 `KeyError`、`UnsafeQueryError` 和数据库工具异常全部折叠成同一个通用错误码。这样做避免了泄露连接信息和原始 SQL，却没有告诉模型“这是指标名不存在”还是“这条 SQL 被安全策略拒绝”，模型只能继续盲试，最后耗尽步数。
+
+这次问题体现了 Agent 设计中的一个重要平衡：**安全报错不能泄露内部细节，但必须足够可修正。**修复后，指标找不到时工具结果给模型 `metric_not_found`；SQL 违反受控边界时给 `query_rejected`；其他内部执行故障仍保持 `tool_execution_failed`。这些是稳定的、无敏感信息的机器可读错误码，模型可据此调整下一次调用，但看不到原 SQL、数据库 URL、堆栈或密钥。
+
+同时，系统提示增加了最小的业务导航，而不是开放任意数据库能力：列出合法指标名，并明确说明“州销售额使用 `marts.state_performance` 的 `customer_state` 和 `item_revenue`；得到一次有效受控查询结果后直接作答，不要重复相同调用”。这样模型面对本题应优先形成类似 `SELECT customer_state, item_revenue FROM marts.state_performance ORDER BY item_revenue DESC LIMIT 1` 的单条白名单查询；SQL 仍会经过 Day 18 的 AST、函数白名单、只读事务、超时和行数限制。
+
+修复采用 TDD。先写一个 scripted fake client：它依次请求无效指标 `sales` 和被安全层拒绝的 SQL，断言回传的工具消息分别含 `metric_not_found`、`query_rejected`，且不含原始私密拒绝文本；运行后测试如预期失败，因为旧代码只产生 `tool_execution_failed`。随后只在编排层增加 `KeyError` 与 `UnsafeQueryError` 的安全映射和受控提示；修复后 `tests/agent/test_orchestrator.py` 的 15 项测试通过，Ruff 与 `git diff --check` 通过。这个过程说明：遇到真实模型失败时，先利用可折叠轨迹定位“模型请求了什么、哪个工具失败”，再写可重复的回归测试，而不是直接把最大步数从 6 调大。增加步数只会提高成本，不能解决信息不足或工具契约不清的问题。
