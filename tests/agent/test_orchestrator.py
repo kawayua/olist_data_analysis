@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import json
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -287,3 +290,62 @@ def test_direct_final_answer_includes_explicit_missing_evidence_contract():
     assert answer.metric_definition == {"name": "未提供", "definition": "未提供"}
     assert answer.data_range == {"start": "未提供", "end": "未提供"}
     assert any("未提供" in limitation for limitation in answer.limitations)
+
+
+def test_successful_trace_is_json_serializable_and_redacts_nested_secrets():
+    tools = MultiFakeTools()
+    secret = "nested-secret"
+    client = ScriptedClient(
+        [
+            LLMResponse(
+                "",
+                [
+                    _call(
+                        "c1",
+                        "create_chart",
+                        {
+                            "chart_type": "bar",
+                            "data": [
+                                {
+                                    "x": Decimal("1.20"),
+                                    "y": datetime(2026, 8, 20, 9, 30, tzinfo=UTC),
+                                    "metadata": {"api_key": secret},
+                                    "audit_entries": [{"token": secret}],
+                                    "tags": {"one", "two"},
+                                }
+                            ],
+                            "x": "x",
+                            "y": "y",
+                        },
+                    )
+                ],
+            ),
+            LLMResponse("完成", []),
+        ]
+    )
+
+    answer = AnalysisAgent(client, tools).run("画图")
+
+    serialized = json.dumps(asdict(answer.tool_trace[0]), ensure_ascii=False)
+    assert secret not in serialized
+    assert answer.tool_trace[0].arguments["data"][0]["metadata"]["api_key"] == "[REDACTED]"
+    assert (
+        answer.tool_trace[0].arguments["data"][0]["audit_entries"][0]["token"]
+        == "[REDACTED]"
+    )
+
+
+def test_unvalidated_sql_is_not_retained_in_audit_arguments():
+    client = ScriptedClient(
+        [
+            LLMResponse(
+                "",
+                [_call("s1", "run_safe_sql", {"sql": "SELECT 'secret'", "extra": 1})],
+            ),
+            LLMResponse("拒绝", []),
+        ]
+    )
+
+    answer = AnalysisAgent(client, MultiFakeTools()).run("查询")
+
+    assert answer.tool_trace[0].arguments["sql"] == "[REDACTED]"

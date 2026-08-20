@@ -195,7 +195,7 @@ class AnalysisAgent:
         return result, ToolTrace(
             call_id=call.id,
             name=call.name,
-            arguments=_audit_arguments(call.arguments),
+            arguments=_audit_arguments(call.arguments, retain_sql=call.name == "run_safe_sql"),
             status="success",
             elapsed_ms=elapsed,
             result_summary=_summarize(result),
@@ -208,7 +208,7 @@ class AnalysisAgent:
         return {"status": "error", "error": error}, ToolTrace(
             call_id=call.id,
             name=call.name,
-            arguments=_audit_arguments(call.arguments),
+            arguments=_audit_arguments(call.arguments, retain_sql=False),
             status="error",
             elapsed_ms=_elapsed_ms(started),
             result_summary=error,
@@ -279,10 +279,16 @@ _MAX_AUDIT_STRING_LENGTH = 256
 _MAX_AUDIT_ITEMS = 20
 
 
-def _audit_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+def _audit_arguments(
+    arguments: dict[str, Any], *, retain_sql: bool
+) -> dict[str, Any]:
     """Copy arguments for the audit trail without retaining secrets or huge payloads."""
     return {
-        str(key): _audit_value(value, sensitive=_is_sensitive_key(str(key)))
+        str(key): _audit_value(
+            value,
+            sensitive=_is_sensitive_key(str(key))
+            or (str(key).lower() == "sql" and not retain_sql),
+        )
         for key, value in list(arguments.items())[:_MAX_AUDIT_ITEMS]
     }
 
@@ -301,9 +307,19 @@ def _audit_value(value: Any, *, sensitive: bool = False) -> Any:
         }
     if isinstance(value, list):
         return [_audit_value(item) for item in value[:_MAX_AUDIT_ITEMS]]
-    return value
+    if isinstance(value, tuple | set):
+        return [_audit_value(item) for item in list(value)[:_MAX_AUDIT_ITEMS]]
+    if isinstance(value, bool | int | float) or value is None:
+        return value
+    return _bounded_text(str(value))
 
 
 def _is_sensitive_key(key: str) -> bool:
     normalized = key.lower().replace("-", "_")
     return any(marker in normalized for marker in _SENSITIVE_ARGUMENT_MARKERS)
+
+
+def _bounded_text(value: str) -> str:
+    if len(value) <= _MAX_AUDIT_STRING_LENGTH:
+        return value
+    return value[:_MAX_AUDIT_STRING_LENGTH] + "…[已截断]"
