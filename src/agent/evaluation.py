@@ -43,7 +43,8 @@ class CaseResult:
     id: str
     category: str
     tool_selection_correct: bool
-    sql_success_correct: bool
+    sql_expected: bool
+    sql_succeeded: bool
     numeric_correct: bool | None
     rejected: bool
     rejection_correct: bool | None
@@ -77,6 +78,8 @@ def load_golden_cases(path: Path) -> list[GoldenCase]:
     cases = [_parse_case(record) for record in records]
     if len({case.id for case in cases}) != len(cases):
         raise ValueError("question ids must be unique")
+    if len({case.question for case in cases}) != len(cases):
+        raise ValueError("questions must be unique")
     missing = REQUIRED_CATEGORIES.difference(case.category for case in cases)
     if missing:
         raise ValueError(
@@ -89,9 +92,18 @@ def load_golden_cases(path: Path) -> list[GoldenCase]:
 
 
 def evaluate_agent(
-    agent: RunnableAgent, cases: Sequence[GoldenCase], output_path: Path
+    agent: RunnableAgent,
+    cases: Sequence[GoldenCase],
+    output_path: Path,
+    *,
+    estimated_cost_per_case_usd: float = 0.0,
+    max_total_latency_ms: int | None = None,
 ) -> EvaluationReport:
     """Run the supplied agent once per question and persist an inspectable report."""
+    if estimated_cost_per_case_usd < 0:
+        raise ValueError("estimated_cost_per_case_usd must be non-negative")
+    if max_total_latency_ms is not None and max_total_latency_ms <= 0:
+        raise ValueError("max_total_latency_ms must be positive")
     results: list[CaseResult] = []
     for case in cases:
         started = time.perf_counter()
@@ -107,7 +119,8 @@ def evaluate_agent(
                 id=case.id,
                 category=case.category,
                 tool_selection_correct=tool_names == case.expected_tools,
-                sql_success_correct=bool(answer.sql) == case.expected_sql_success,
+                sql_expected=case.expected_sql_success,
+                sql_succeeded=case.expected_sql_success and bool(answer.sql),
                 numeric_correct=numeric_correct,
                 rejected=rejected,
                 rejection_correct=(rejected == case.should_reject)
@@ -119,13 +132,20 @@ def evaluate_agent(
                 tool_calls=len(answer.tool_trace),
             )
         )
+        if (
+            max_total_latency_ms is not None
+            and sum(result.latency_ms for result in results) >= max_total_latency_ms
+        ):
+            break
 
     report = EvaluationReport(
         total_cases=len(results),
         tool_selection_accuracy=_ratio(
             result.tool_selection_correct for result in results
         ),
-        sql_success_rate=_ratio(result.sql_success_correct for result in results),
+        sql_success_rate=_ratio(
+            result.sql_succeeded for result in results if result.sql_expected
+        ),
         numeric_accuracy=_ratio(
             result.numeric_correct
             for result in results
@@ -141,9 +161,7 @@ def evaluate_agent(
         )
         if results
         else 0.0,
-        # The supported deterministic agent exposes no paid model usage.  A live
-        # evaluator must supply provider usage before its cost can be estimated.
-        estimated_cost_usd=0.0,
+        estimated_cost_usd=round(len(results) * estimated_cost_per_case_usd, 6),
         case_results=tuple(results),
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)

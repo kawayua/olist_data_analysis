@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+import yaml
 
 from src.agent.orchestrator import AgentAnswer, ToolTrace
+from src.config import Settings
 
 
 @dataclass
@@ -87,6 +89,30 @@ def test_fake_evaluation_writes_rejection_and_tool_metrics(tmp_path: Path):
     assert artifact["case_results"][1]["rejected"] is True
 
 
+def test_sql_success_rate_only_scores_cases_that_require_sql(tmp_path: Path):
+    from src.agent.evaluation import evaluate_agent
+
+    class UnexpectedSqlAgent:
+        def run(self, question: str) -> AgentAnswer:
+            return AgentAnswer(answer="result", tool_trace=(), sql="SELECT 1")
+
+    report = evaluate_agent(
+        UnexpectedSqlAgent(),
+        [
+            _case(),
+            _case(
+                id="definition-001",
+                expected_tools=(),
+                expected_sql_success=False,
+                expected_numeric=None,
+            ),
+        ],
+        tmp_path / "evaluation.json",
+    )
+
+    assert report.sql_success_rate == 1.0
+
+
 def test_question_config_requires_at_least_thirty_cases_and_all_categories(
     tmp_path: Path,
 ):
@@ -136,6 +162,139 @@ def test_committed_questions_cover_required_categories_and_malicious_rejections(
     assert REQUIRED_CATEGORIES <= {case.category for case in cases}
     malicious = [case for case in cases if case.category == "恶意SQL"]
     assert malicious and all(case.should_reject for case in malicious)
+    unanswerable = [case for case in cases if case.category == "不可回答"]
+    assert unanswerable and all(case.should_reject for case in unanswerable)
+    numeric_categories = {
+        case.category for case in cases if case.expected_numeric is not None
+    }
+    assert {"增长", "留存", "客户", "商品", "履约"} <= numeric_categories
+
+
+def test_question_config_rejects_duplicate_questions(tmp_path: Path):
+    from src.agent.evaluation import load_golden_cases
+
+    source = yaml.safe_load(
+        Path("configs/agent_questions.yml").read_text(encoding="utf-8")
+    )
+    source["questions"][-1]["question"] = source["questions"][0]["question"]
+    path = tmp_path / "duplicate-question.yml"
+    path.write_text(yaml.safe_dump(source, allow_unicode=True), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="questions must be unique"):
+        load_golden_cases(path)
+
+
+def test_live_evaluation_requires_explicit_confirmation_before_agent_factory_runs(
+    tmp_path: Path,
+):
+    from scripts.evaluate_agent import LiveEvaluationBudget, run_live_evaluation
+
+    factory_called = False
+
+    def factory(_: Settings) -> FakeAgent:
+        nonlocal factory_called
+        factory_called = True
+        return FakeAgent()
+
+    with pytest.raises(SystemExit, match="--confirm-live"):
+        run_live_evaluation(
+            Settings(llm_api_key="key", llm_model="model"),
+            [_case()],
+            tmp_path / "live.json",
+            LiveEvaluationBudget(),
+            confirmed=False,
+            agent_factory=factory,
+        )
+
+    assert factory_called is False
+
+
+def test_live_evaluation_uses_injected_agent_within_case_cost_and_latency_budgets(
+    tmp_path: Path,
+):
+    from scripts.evaluate_agent import LiveEvaluationBudget, run_live_evaluation
+
+    received: list[Settings] = []
+
+    def factory(settings: Settings) -> FakeAgent:
+        received.append(settings)
+        return FakeAgent()
+
+    settings = Settings(llm_api_key="key", llm_model="model")
+    report = run_live_evaluation(
+        settings,
+        [_case()],
+        tmp_path / "live.json",
+        LiveEvaluationBudget(
+            max_cases=1,
+            max_total_latency_ms=100,
+            max_estimated_cost_usd=0.01,
+            estimated_cost_per_case_usd=0.01,
+        ),
+        confirmed=True,
+        agent_factory=factory,
+    )
+
+    assert received == [settings]
+    assert report.total_cases == 1
+    assert report.estimated_cost_usd == 0.01
+
+
+def test_live_evaluation_rejects_budget_that_exceeds_cost_cap(tmp_path: Path):
+    from scripts.evaluate_agent import LiveEvaluationBudget, run_live_evaluation
+
+    with pytest.raises(SystemExit, match="cost cap"):
+        run_live_evaluation(
+            Settings(llm_api_key="key", llm_model="model"),
+            [_case(), _case(id="metric-002")],
+            tmp_path / "live.json",
+            LiveEvaluationBudget(
+                max_cases=2,
+                max_total_latency_ms=100,
+                max_estimated_cost_usd=0.01,
+                estimated_cost_per_case_usd=0.01,
+            ),
+            confirmed=True,
+            agent_factory=lambda _: FakeAgent(),
+        )
+
+
+def test_live_evaluation_stops_after_total_latency_cap(tmp_path: Path):
+    from scripts.evaluate_agent import LiveEvaluationBudget, run_live_evaluation
+
+    class TimedAgent:
+        def run(self, question: str) -> AgentAnswer:
+            return AgentAnswer(
+                answer="result",
+                tool_trace=(
+                    ToolTrace(
+                        call_id="timed-1",
+                        name="run_safe_sql",
+                        arguments={},
+                        status="success",
+                        elapsed_ms=5,
+                        result_summary="result",
+                    ),
+                ),
+                sql="SELECT 1",
+            )
+
+    report = run_live_evaluation(
+        Settings(llm_api_key="key", llm_model="model"),
+        [_case(), _case(id="metric-002")],
+        tmp_path / "live.json",
+        LiveEvaluationBudget(
+            max_cases=2,
+            max_total_latency_ms=5,
+            max_estimated_cost_usd=0.02,
+            estimated_cost_per_case_usd=0.01,
+        ),
+        confirmed=True,
+        agent_factory=lambda _: TimedAgent(),
+    )
+
+    assert report.total_cases == 1
+    assert report.estimated_cost_usd == 0.01
 
 
 def test_fake_evaluation_cli_runs_without_model_or_database():
