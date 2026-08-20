@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-def test_dashboard_contains_six_governed_analysis_pages():
+def test_dashboard_contains_seven_governed_analysis_pages():
     page_directory = Path("app/pages")
     expected_pages = {
         "1_经营总览.py",
@@ -10,6 +10,7 @@ def test_dashboard_contains_six_governed_analysis_pages():
         "4_客户价值.py",
         "5_商品与履约.py",
         "6_营销ROI模拟器.py",
+        "7_AI分析助手.py",
     }
 
     assert {path.name for path in page_directory.glob("*.py")} == expected_pages
@@ -22,8 +23,14 @@ def test_dashboard_contains_six_governed_analysis_pages():
         assert "render_cohort_filter" not in content
         assert "render_category_filter" not in content
         assert "filters =" not in content
-        assert "get_repository" in content
         assert "st.info" in content
+
+    for page in page_directory.glob("[1-6]_*.py"):
+        assert "get_repository" in page.read_text(encoding="utf-8")
+
+    ai_assistant = (page_directory / "7_AI分析助手.py").read_text(encoding="utf-8")
+    assert "AnalysisTools" in ai_assistant
+    assert "AnalysisAgent" in ai_assistant
 
 
 def test_filtered_analysis_loaders_use_default_dashboard_filters():
