@@ -349,3 +349,22 @@ def test_unvalidated_sql_is_not_retained_in_audit_arguments():
     answer = AnalysisAgent(client, MultiFakeTools()).run("查询")
 
     assert answer.tool_trace[0].arguments["sql"] == "[REDACTED]"
+
+
+def test_tool_trace_includes_ordered_utc_audit_timestamps():
+    client = ScriptedClient(
+        [
+            LLMResponse("", [_call("s1", "run_safe_sql", {"sql": "SELECT 1"})]),
+            LLMResponse("完成", []),
+        ]
+    )
+
+    answer = AnalysisAgent(client, MultiFakeTools()).run("查询")
+
+    trace = answer.tool_trace[0]
+    started = datetime.fromisoformat(trace.started_at)
+    finished = datetime.fromisoformat(trace.finished_at)
+    assert started.tzinfo == UTC
+    assert finished.tzinfo == UTC
+    assert started <= finished
+    json.dumps(asdict(trace), ensure_ascii=False)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -73,6 +74,8 @@ class ToolTrace:
     status: str
     elapsed_ms: int
     result_summary: str
+    started_at: str = "未提供"
+    finished_at: str = "未提供"
 
 
 @dataclass(frozen=True)
@@ -178,18 +181,21 @@ class AnalysisAgent:
         self, call: ToolCall, allowed_names: set[str]
     ) -> tuple[dict[str, Any], ToolTrace]:
         started = time.perf_counter()
+        started_at = _utc_timestamp()
         if call.name not in allowed_names or call.name not in ARGUMENT_MODELS:
-            return self._failure_trace(call, started, "unknown_tool")
+            return self._failure_trace(call, started, started_at, "unknown_tool")
         try:
             arguments = ARGUMENT_MODELS[call.name].model_validate(call.arguments)
         except ValidationError:
-            return self._failure_trace(call, started, "invalid_arguments")
+            return self._failure_trace(call, started, started_at, "invalid_arguments")
         try:
             method = getattr(self._tools, call.name)
             raw_result = method(**arguments.model_dump())
             result = raw_result if isinstance(raw_result, dict) else {"result": raw_result}
         except Exception:  # noqa: BLE001 - tool internals must not leak to the model.
-            return self._failure_trace(call, started, "tool_execution_failed")
+            return self._failure_trace(
+                call, started, started_at, "tool_execution_failed"
+            )
 
         elapsed = _elapsed_ms(started)
         return result, ToolTrace(
@@ -197,19 +203,23 @@ class AnalysisAgent:
             name=call.name,
             arguments=_audit_arguments(call.arguments, retain_sql=call.name == "run_safe_sql"),
             status="success",
+            started_at=started_at,
+            finished_at=_utc_timestamp(),
             elapsed_ms=elapsed,
             result_summary=_summarize(result),
         )
 
     @staticmethod
     def _failure_trace(
-        call: ToolCall, started: float, error: str
+        call: ToolCall, started: float, started_at: str, error: str
     ) -> tuple[dict[str, Any], ToolTrace]:
         return {"status": "error", "error": error}, ToolTrace(
             call_id=call.id,
             name=call.name,
             arguments=_audit_arguments(call.arguments, retain_sql=False),
             status="error",
+            started_at=started_at,
+            finished_at=_utc_timestamp(),
             elapsed_ms=_elapsed_ms(started),
             result_summary=error,
         )
@@ -263,6 +273,10 @@ def _collect_evidence(
 
 def _elapsed_ms(started: float) -> int:
     return round((time.perf_counter() - started) * 1_000)
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 def _json_text(value: Any) -> str:
