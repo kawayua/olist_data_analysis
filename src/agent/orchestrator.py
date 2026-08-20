@@ -67,6 +67,7 @@ class GovernedTools(Protocol):
 class ToolTrace:
     """One model-requested tool call with a privacy-safe result summary."""
 
+    call_id: str
     name: str
     arguments: dict[str, Any]
     status: str
@@ -94,8 +95,8 @@ class AnalysisAgent:
     def __init__(
         self, client: CompletionClient, tools: GovernedTools, max_steps: int = 6
     ) -> None:
-        if max_steps < 1:
-            raise ValueError("max_steps must be at least one")
+        if not 1 <= max_steps <= 6:
+            raise ValueError("max_steps must be between one and six")
         self._client = client
         self._tools = tools
         self._max_steps = max_steps
@@ -118,7 +119,7 @@ class AnalysisAgent:
         last_failure: tuple[str, str] | None = None
         repeated_failures = 0
 
-        for _ in range(self._max_steps):
+        while len(trace) < self._max_steps:
             response = self._client.complete(messages, definitions)
             if response.error:
                 limitations.append("模型服务暂不可用，未执行额外查询。")
@@ -128,17 +129,19 @@ class AnalysisAgent:
                     response.text or "未获得可用分析结论。", trace, evidence, limitations
                 )
 
+            remaining_calls = self._max_steps - len(trace)
+            calls_to_execute = response.tool_calls[:remaining_calls]
             messages.append(
                 {
                     "role": "assistant",
                     "content": response.text,
                     "tool_calls": [
                         {"id": call.id, "name": call.name, "args": call.arguments}
-                        for call in response.tool_calls
+                        for call in calls_to_execute
                     ],
                 }
             )
-            for call in response.tool_calls:
+            for call in calls_to_execute:
                 result, item = self._execute_call(call, allowed_names)
                 trace.append(item)
                 messages.append(
@@ -163,8 +166,13 @@ class AnalysisAgent:
                     limitations.append("相同工具调用连续失败，已安全停止。")
                     return self._answer("未能完成该分析。", trace, evidence, limitations)
 
-        limitations.append(f"已达到 {self._max_steps} 步工具调用上限。")
-        return self._answer("分析未在允许步数内完成。", trace, evidence, limitations)
+                if len(trace) == self._max_steps:
+                    return self._step_limit_answer(trace, evidence, limitations)
+
+            if len(trace) == self._max_steps:
+                return self._step_limit_answer(trace, evidence, limitations)
+
+        return self._step_limit_answer(trace, evidence, limitations)
 
     def _execute_call(
         self, call: ToolCall, allowed_names: set[str]
@@ -185,8 +193,9 @@ class AnalysisAgent:
 
         elapsed = _elapsed_ms(started)
         return result, ToolTrace(
+            call_id=call.id,
             name=call.name,
-            arguments=call.arguments,
+            arguments=_audit_arguments(call.arguments),
             status="success",
             elapsed_ms=elapsed,
             result_summary=_summarize(result),
@@ -197,8 +206,9 @@ class AnalysisAgent:
         call: ToolCall, started: float, error: str
     ) -> tuple[dict[str, Any], ToolTrace]:
         return {"status": "error", "error": error}, ToolTrace(
+            call_id=call.id,
             name=call.name,
-            arguments=call.arguments,
+            arguments=_audit_arguments(call.arguments),
             status="error",
             elapsed_ms=_elapsed_ms(started),
             result_summary=error,
@@ -211,16 +221,33 @@ class AnalysisAgent:
         evidence: dict[str, Any],
         limitations: list[str],
     ) -> AgentAnswer:
+        metric_definition = evidence.get("metric_definition")
+        data_range = evidence.get("data_range")
+        if metric_definition is None:
+            metric_definition = {"name": "未提供", "definition": "未提供"}
+            limitations.append("指标口径未提供。")
+        if data_range is None:
+            data_range = {"start": "未提供", "end": "未提供"}
+            limitations.append("数据范围未提供。")
         return AgentAnswer(
             answer=answer,
             tool_trace=tuple(trace),
             sql=evidence.get("sql"),
-            metric_definition=evidence.get("metric_definition"),
-            data_range=evidence.get("data_range"),
+            metric_definition=metric_definition,
+            data_range=data_range,
             limitations=tuple(limitations),
             rows=evidence.get("rows"),
             chart=evidence.get("chart"),
         )
+
+    def _step_limit_answer(
+        self,
+        trace: list[ToolTrace],
+        evidence: dict[str, Any],
+        limitations: list[str],
+    ) -> AgentAnswer:
+        limitations.append(f"已达到 {self._max_steps} 步工具调用上限。")
+        return self._answer("分析未在允许步数内完成。", trace, evidence, limitations)
 
 
 def _collect_evidence(
@@ -245,3 +272,38 @@ def _json_text(value: Any) -> str:
 def _summarize(result: dict[str, Any]) -> str:
     keys = ", ".join(sorted(result)[:4])
     return f"返回字段：{keys}" if keys else "工具执行成功"
+
+
+_SENSITIVE_ARGUMENT_MARKERS = ("api_key", "authorization", "password", "secret", "token")
+_MAX_AUDIT_STRING_LENGTH = 256
+_MAX_AUDIT_ITEMS = 20
+
+
+def _audit_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Copy arguments for the audit trail without retaining secrets or huge payloads."""
+    return {
+        str(key): _audit_value(value, sensitive=_is_sensitive_key(str(key)))
+        for key, value in list(arguments.items())[:_MAX_AUDIT_ITEMS]
+    }
+
+
+def _audit_value(value: Any, *, sensitive: bool = False) -> Any:
+    if sensitive:
+        return "[REDACTED]"
+    if isinstance(value, str):
+        if len(value) <= _MAX_AUDIT_STRING_LENGTH:
+            return value
+        return value[:_MAX_AUDIT_STRING_LENGTH] + "…[已截断]"
+    if isinstance(value, dict):
+        return {
+            str(key): _audit_value(item, sensitive=_is_sensitive_key(str(key)))
+            for key, item in list(value.items())[:_MAX_AUDIT_ITEMS]
+        }
+    if isinstance(value, list):
+        return [_audit_value(item) for item in value[:_MAX_AUDIT_ITEMS]]
+    return value
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    return any(marker in normalized for marker in _SENSITIVE_ARGUMENT_MARKERS)

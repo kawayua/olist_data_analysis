@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import pytest
+
 from src.agent.client import LLMResponse, ToolCall, ToolDefinition
 from src.agent.orchestrator import AnalysisAgent
 
@@ -217,3 +219,71 @@ def test_agent_extracts_sql_rows_chart_and_data_range_from_tool_results():
     assert answer.rows == [{"month": "2018-01", "item_revenue": 100}]
     assert answer.chart == {"figure": {"data": []}, "chart_type": "bar"}
     assert answer.data_range == {"start": "2018-01-01", "end": "2018-08-31"}
+
+
+@pytest.mark.parametrize("max_steps", [0, 7])
+def test_agent_rejects_step_limits_outside_hard_safety_bound(max_steps: int):
+    with pytest.raises(ValueError, match="between one and six"):
+        AnalysisAgent(ScriptedClient([]), MultiFakeTools(), max_steps=max_steps)
+
+
+def test_agent_counts_each_tool_call_against_step_budget():
+    tools = MultiFakeTools()
+    client = ScriptedClient(
+        [
+            LLMResponse(
+                "",
+                [
+                    _call("s1", "run_safe_sql", {"sql": "SELECT 1"}),
+                    _call("s2", "run_safe_sql", {"sql": "SELECT 2"}),
+                    _call("s3", "run_safe_sql", {"sql": "SELECT 3"}),
+                ],
+            )
+        ]
+    )
+
+    answer = AnalysisAgent(client, tools, max_steps=2).run("查询")
+
+    assert [value for _, value in tools.calls] == ["SELECT 1", "SELECT 2"]
+    assert [item.call_id for item in answer.tool_trace] == ["s1", "s2"]
+    assert "2 步" in answer.limitations[0]
+
+
+def test_tool_trace_redacts_secrets_and_bounds_large_audit_arguments():
+    tools = MultiFakeTools()
+    secret = "super-secret-token"
+    huge_value = "x" * 2_000
+    client = ScriptedClient(
+        [
+            LLMResponse(
+                "",
+                [
+                    _call(
+                        "s1",
+                        "run_safe_sql",
+                        {"sql": "SELECT 1", "api_key": secret, "note": huge_value},
+                    )
+                ],
+            ),
+            LLMResponse("完成", []),
+        ]
+    )
+
+    answer = AnalysisAgent(client, tools).run("查询")
+
+    assert tools.calls == []
+    trace_arguments = answer.tool_trace[0].arguments
+    serialized = str(trace_arguments)
+    assert secret not in serialized
+    assert huge_value not in serialized
+    assert trace_arguments["api_key"] == "[REDACTED]"
+
+
+def test_direct_final_answer_includes_explicit_missing_evidence_contract():
+    answer = AnalysisAgent(
+        ScriptedClient([LLMResponse("当前没有可查询证据。", [])]), MultiFakeTools()
+    ).run("告诉我结论")
+
+    assert answer.metric_definition == {"name": "未提供", "definition": "未提供"}
+    assert answer.data_range == {"start": "未提供", "end": "未提供"}
+    assert any("未提供" in limitation for limitation in answer.limitations)
