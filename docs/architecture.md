@@ -27,9 +27,9 @@ flowchart LR
 
 ## 时间安全的标签 / Observation-window-safe labels
 
-**中文。** 建模集市在首笔已送达订单的送达时间设定 `prediction_time` 和 `feature_available_at`。标签仅搜索未来 `(prediction_time, prediction_time + 90 天]` 的已送达订单，并要求数据观察终点已覆盖该窗口；否则 `eligible_for_90d = false`、标签为 NULL。时间切分为训练、选择、校准和最终测试，最终测试不参与选择。这样不使用未来订单、评论、最终 RFM 或最终累计消费等在预测时不可见的信息。
+**中文。** 建模集市在首笔已送达订单的送达时间设定 `prediction_time` 和 `feature_available_at`。标签选择后续已送达订单，但窗口比较的是后续已送达订单的 `purchased_at` 是否在 `(prediction_time, prediction_time + 90 天]`，并要求数据观察终点已覆盖该窗口；它不以该后续订单的送达时间比较。否则 `eligible_for_90d = false`、标签为 NULL。时间切分为训练、选择、校准和最终测试，最终测试不参与选择。这样不使用未来订单、评论、最终 RFM 或最终累计消费等在预测时不可见的信息。
 
-**English.** The modeling mart sets `prediction_time` and `feature_available_at` at the delivery time of the first delivered order. The label searches only future delivered orders in `(prediction_time, prediction_time + 90 days]` and requires the data observation end to cover that window; otherwise `eligible_for_90d = false` and the label is NULL. Time is split into training, selection, calibration, and final test, and final test does not participate in selection. This avoids future orders, reviews, final RFM, or final cumulative spend that would be unavailable at prediction time.
+**English.** The modeling mart sets `prediction_time` and `feature_available_at` at the delivery time of the first delivered order. The label selects a later delivered order, but compares that later delivered order's `purchased_at` with `(prediction_time, prediction_time + 90 days]` and requires the data observation end to cover that window; it does not compare that later order's delivery time. Otherwise `eligible_for_90d = false` and the label is NULL. Time is split into training, selection, calibration, and final test, and final test does not participate in selection. This avoids future orders, reviews, final RFM, or final cumulative spend that would be unavailable at prediction time.
 
 ## Agent 安全边界 / Agent safety boundary
 

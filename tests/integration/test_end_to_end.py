@@ -41,3 +41,17 @@ def test_portfolio_documents_cover_local_reproduction_and_evidence() -> None:
         content = Path(document).read_text(encoding="utf-8")
         for term in expected_terms:
             assert term in content, f"{document} must document {term!r}"
+
+    readme = Path("README.md").read_text(encoding="utf-8")
+    assert "py -3.13 scripts/load_raw.py --data-dir data/raw" in readme
+
+    for document in (
+        "README.md",
+        "docs/architecture.md",
+        "docs/metric-dictionary.md",
+        "docs/interview-guide.md",
+        "docs/retrospectives/final.md",
+    ):
+        content = Path(document).read_text(encoding="utf-8")
+        assert "后续已送达订单的 `purchased_at`" in content
+        assert "later delivered order's `purchased_at`" in content

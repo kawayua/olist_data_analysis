@@ -31,7 +31,7 @@ py -3.13 -m streamlit run app/Home.py --server.port 8501
 
 ```powershell
 py -3.13 scripts/bootstrap_db.py
-py -3.13 scripts/load_raw.py
+py -3.13 scripts/load_raw.py --data-dir data/raw
 py -3.13 scripts/build_warehouse.py
 py -3.13 scripts/build_marts.py
 py -3.13 scripts/train_model.py
@@ -51,7 +51,7 @@ To restore an empty database, first place the nine CSVs as described in [data/RE
 
 ```powershell
 py -3.13 scripts/bootstrap_db.py
-py -3.13 scripts/load_raw.py
+py -3.13 scripts/load_raw.py --data-dir data/raw
 py -3.13 scripts/build_warehouse.py
 py -3.13 scripts/build_marts.py
 py -3.13 scripts/train_model.py
@@ -77,9 +77,9 @@ Routine acceptance does not download CSVs, rebuild tables, train a model, or cal
 
 ## 时间安全的机器学习 / Leakage-safe machine learning
 
-**中文。** `marts.ml_customer_features` 每位客户一行。`prediction_time` 是首笔已送达订单的送达时间，六个特征仅来自首单：商品件数、商品金额、运费、支付金额、配送时长和品类数。标签是 `(prediction_time, prediction_time + 90 天]` 是否出现后续已送达订单；`eligible_for_90d` 排除观察期不足的客户。82,500 个完整样本按时间切为训练 49,500、选择 12,375、校准 4,125、最终测试 16,500；模型选择不用最终测试集。候选是 class-balanced 逻辑回归、随机森林和 LightGBM，以选择期 PR-AUC 为主、Lift@10% 为并列裁决，选中逻辑回归。最终测试中，选中模型 PR-AUC 0.012274、ROC-AUC 0.543393、Lift@10% 1.226994、Brier 0.009785；首单金额规则的 PR-AUC 为 0.009855、Lift@10% 为 0.858896。它只能帮助有限触达的排序，绝对精度较低，不能证明营销增量或因果关系。
+**中文。** `marts.ml_customer_features` 每位客户一行。`prediction_time` 是首笔已送达订单的送达时间，六个特征仅来自首单：商品件数、商品金额、运费、支付金额、配送时长和品类数。标签选择后续已送达订单，但窗口实际比较的是该后续已送达订单的 `purchased_at` 是否落在 `(prediction_time, prediction_time + 90 天]`，不是其送达时间；`eligible_for_90d` 排除观察期不足的客户。82,500 个完整样本按时间切为训练 49,500、选择 12,375、校准 4,125、最终测试 16,500；模型选择不用最终测试集。候选是 class-balanced 逻辑回归、随机森林和 LightGBM，以选择期 PR-AUC 为主、Lift@10% 为并列裁决，选中逻辑回归。最终测试中，选中模型 PR-AUC 0.012274、ROC-AUC 0.543393、Lift@10% 1.226994、Brier 0.009785；首单金额规则的 PR-AUC 为 0.009855、Lift@10% 为 0.858896。它只能帮助有限触达的排序，绝对精度较低，不能证明营销增量或因果关系。
 
-**English.** `marts.ml_customer_features` has one row per customer. `prediction_time` is the delivery time of the first delivered order, and the six features come only from that first order: item count, item revenue, freight, payment value, delivery duration, and category count. The label is whether a later delivered order occurs in `(prediction_time, prediction_time + 90 days]`; `eligible_for_90d` excludes customers without a complete observation window. The 82,500 complete samples are temporally split into 49,500 training, 12,375 selection, 4,125 calibration, and 16,500 final-test rows; final test data is not used for selection. Candidates are class-balanced logistic regression, random forest, and LightGBM; selection prioritizes PR-AUC with Lift@10% as a tie-breaker, and logistic regression is selected. On final test, the selected model has PR-AUC 0.012274, ROC-AUC 0.543393, Lift@10% 1.226994, and Brier 0.009785; the first-order-item-revenue rule has PR-AUC 0.009855 and Lift@10% 0.858896. It only supports ranking under limited outreach, has low absolute precision, and does not prove marketing incrementality or causality.
+**English.** `marts.ml_customer_features` has one row per customer. `prediction_time` is the delivery time of the first delivered order, and the six features come only from that first order: item count, item revenue, freight, payment value, delivery duration, and category count. The label selects a later delivered order, but the window actually compares that later delivered order's `purchased_at` with `(prediction_time, prediction_time + 90 days]`, not its delivery time; `eligible_for_90d` excludes customers without a complete observation window. The 82,500 complete samples are temporally split into 49,500 training, 12,375 selection, 4,125 calibration, and 16,500 final-test rows; final test data is not used for selection. Candidates are class-balanced logistic regression, random forest, and LightGBM; selection prioritizes PR-AUC with Lift@10% as a tie-breaker, and logistic regression is selected. On final test, the selected model has PR-AUC 0.012274, ROC-AUC 0.543393, Lift@10% 1.226994, and Brier 0.009785; the first-order-item-revenue rule has PR-AUC 0.009855 and Lift@10% 0.858896. It only supports ranking under limited outreach, has low absolute precision, and does not prove marketing incrementality or causality.
 
 ## Agent 边界与限制 / Agent boundaries and limitations
 
