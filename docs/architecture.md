@@ -39,6 +39,6 @@ flowchart LR
 
 ## 运行模式 / Operating modes
 
-**中文。** Docker Compose 仅运行 PostgreSQL；Streamlit 由本地 Python 3.13 启动。`verify_project.py` 的默认检查观察容器、模式、集市、产物和 Git 状态，不下载数据、不重建表、不训练模型、不启动 Streamlit、也不调用 LLM。完整模式只在健康检查后运行项目测试和 Ruff。恢复模式才依序 bootstrap、加载 raw、构建 warehouse/marts、训练模型并执行 fake Agent 评估。
+**中文。** Docker Compose 仅运行 PostgreSQL；Streamlit 由本地 Python 3.13 启动。`verify_project.py` 的默认检查观察容器、模式、集市、产物和 Git 状态，不下载数据、不重建表、不训练模型、不启动 Streamlit、也不调用 LLM。完整模式只在健康检查后运行项目测试和 Ruff。恢复模式才依序 bootstrap、加载 raw、构建 warehouse/marts、运行 `py -3.13 scripts/run_quality_checks.py`、训练模型并执行 fake Agent 评估。质量报告入口读取现有数据库，并且只写入 `artifacts/quality/latest.json`，不重建数据层。
 
-**English.** Docker Compose runs PostgreSQL only; Streamlit starts through local Python 3.13. The default `verify_project.py` check observes containers, schemas, marts, artifacts, and Git state; it does not download data, rebuild tables, train a model, start Streamlit, or call an LLM. Full mode runs project tests and Ruff only after health checks. Only restore mode runs bootstrap, raw loading, warehouse/mart building, model training, and fake Agent evaluation in sequence.
+**English.** Docker Compose runs PostgreSQL only; Streamlit starts through local Python 3.13. The default `verify_project.py` check observes containers, schemas, marts, artifacts, and Git state; it does not download data, rebuild tables, train a model, start Streamlit, or call an LLM. Full mode runs project tests and Ruff only after health checks. Only restore mode runs bootstrap, raw loading, warehouse/mart building, `py -3.13 scripts/run_quality_checks.py`, model training, and fake Agent evaluation in sequence. The quality-report entrypoint reads the existing database and writes only `artifacts/quality/latest.json`; it does not rebuild a data layer.

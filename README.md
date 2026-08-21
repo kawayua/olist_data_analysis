@@ -34,11 +34,12 @@ py -3.13 scripts/bootstrap_db.py
 py -3.13 scripts/load_raw.py --data-dir data/raw
 py -3.13 scripts/build_warehouse.py
 py -3.13 scripts/build_marts.py
+py -3.13 scripts/run_quality_checks.py
 py -3.13 scripts/train_model.py
 py -3.13 scripts/evaluate_agent.py --mode fake
 ```
 
-日常验收不需要下载 CSV、重建表、训练模型或调用 LLM：运行 `py -3.13 scripts/verify_project.py`。完整本地检查使用 `py -3.13 scripts/verify_project.py --full`。若数据库未就绪，先确认 Docker 可用并重试 `docker compose up -d`；恢复流程会改动本地派生数据，应与只读验收区分。
+质量报告入口 `py -3.13 scripts/run_quality_checks.py` 读取现有数据库，并且只写入 `artifacts/quality/latest.json`；它不重建数据层。日常验收不需要下载 CSV、重建表、训练模型或调用 LLM：运行 `py -3.13 scripts/verify_project.py`。完整本地检查使用 `py -3.13 scripts/verify_project.py --full`。若数据库未就绪，先确认 Docker 可用并重试 `docker compose up -d`；恢复流程会改动本地派生数据，应与只读验收区分。
 
 **English.** Python 3.13, Docker Compose, and configured local dependencies are required. Copy `.env.example` to an untracked `.env`, fill in local database and optional LLM settings as needed, and never commit `.env`, secrets, or a local volume override. Start the database and dashboard with:
 
@@ -54,11 +55,12 @@ py -3.13 scripts/bootstrap_db.py
 py -3.13 scripts/load_raw.py --data-dir data/raw
 py -3.13 scripts/build_warehouse.py
 py -3.13 scripts/build_marts.py
+py -3.13 scripts/run_quality_checks.py
 py -3.13 scripts/train_model.py
 py -3.13 scripts/evaluate_agent.py --mode fake
 ```
 
-Routine acceptance does not download CSVs, rebuild tables, train a model, or call an LLM: run `py -3.13 scripts/verify_project.py`. Use `py -3.13 scripts/verify_project.py --full` for the complete local check. If the database is not ready, confirm Docker is available and retry `docker compose up -d`; the restore route mutates local derived data and is deliberately separate from read-only acceptance.
+The quality-report entrypoint, `py -3.13 scripts/run_quality_checks.py`, reads the existing database and writes only `artifacts/quality/latest.json`; it does not rebuild a data layer. Routine acceptance does not download CSVs, rebuild tables, train a model, or call an LLM: run `py -3.13 scripts/verify_project.py`. Use `py -3.13 scripts/verify_project.py --full` for the complete local check. If the database is not ready, confirm Docker is available and retry `docker compose up -d`; the restore route mutates local derived data and is deliberately separate from read-only acceptance.
 
 ## 结构与仪表盘 / Structure and dashboard
 
