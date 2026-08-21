@@ -74,3 +74,11 @@ def test_day20_final_retrospective_records_acceptance_results() -> None:
     assert "## Day 20 验收记录 / Day 20 acceptance record" in content
     assert "verify_project.py --full" in content
     assert "不调用真实" in content
+
+
+def test_day20_retrospective_states_accurate_acceptance_sequence() -> None:
+    content = Path("docs/retrospectives/final.md").read_text(encoding="utf-8")
+
+    assert "Docker availability check" in content
+    assert "Docker Compose/Docker startup" in content
+    assert "original two-phrase assertion did not go RED" in content
