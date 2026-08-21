@@ -82,3 +82,10 @@ def test_day20_retrospective_states_accurate_acceptance_sequence() -> None:
     assert "Docker availability check" in content
     assert "Docker Compose/Docker startup" in content
     assert "original two-phrase assertion did not go RED" in content
+
+
+def test_day20_retrospective_records_concurrency_root_cause() -> None:
+    content = Path("docs/retrospectives/final.md").read_text(encoding="utf-8")
+
+    assert "test-process concurrency" in content
+    assert "sequential rerun" in content
