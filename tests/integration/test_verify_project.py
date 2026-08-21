@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -100,6 +102,22 @@ def test_cli_returns_one_for_failed_dependencies(
     assert capsys.readouterr().out == (
         "Docker is unavailable. Start Docker Desktop, then run docker compose up -d.\n"
     )
+
+
+def test_direct_script_entrypoint_imports_project_modules_without_services() -> None:
+    completed = subprocess.run(
+        (sys.executable, "scripts/verify_project.py"),
+        cwd=Path.cwd(),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    combined_output = completed.stdout + completed.stderr
+    assert completed.returncode in (0, 1)
+    assert "ModuleNotFoundError" not in combined_output
+    assert "Traceback" not in combined_output
 
 
 def test_verification_reports_docker_failure(healthy_dependencies: FakeDependencies) -> None:
