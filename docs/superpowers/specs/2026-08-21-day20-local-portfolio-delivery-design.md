@@ -20,11 +20,11 @@ Docker 只负责 PostgreSQL；Streamlit 使用本机 Python 3.13 运行。默认
 
 `scripts/verify_project.py` 提供两个模式。
 
-- 默认模式验证 Docker 引擎可用、PostgreSQL 可连接、`raw`、`staging`、`warehouse`、`marts` schema 存在、关键分析集市存在、四个运行时产物非空（三个 JSON 可解析、joblib 不执行加载），并检查 `.env` 同时未追踪且仍被 Git 忽略。
-- `--full` 在默认检查通过后，只对 `tests/agent`、`tests/analytics`、`tests/ingestion`、`tests/integration`、`tests/ml`、`tests/validation`、`tests/visualization` 执行 pytest，再执行 `py -3.13 -m ruff check src tests app scripts`。它明确排除 `tests/sql` 及 bootstrap/load/build 入口，保留 600 秒有限超时，不触发真实 LLM 或破坏性数据操作。
+- 默认模式验证 Docker 引擎可用、PostgreSQL 可连接、`raw`、`staging`、`warehouse`、`marts` schema 存在、marts 真正依赖的 6 个 raw 表与 5 个 warehouse 表就绪、关键分析集市存在、四个运行时产物非空（三个 JSON 可解析、joblib 不执行加载），并检查 `.env` 同时未追踪且仍被 Git 忽略。
+- `--full` 在默认检查通过后，只对以下逐文件审计的精确清单执行带 `-v` 的 pytest：`tests/test_config.py`、`tests/agent/test_client.py`、`tests/analytics/test_metrics.py`、`tests/analytics/test_retention.py`、`tests/analytics/test_segmentation.py`、`tests/analytics/test_statistics.py`、`tests/integration/test_end_to_end.py`、`tests/integration/test_verify_project.py`、`tests/ml/test_roi.py`、`tests/validation/test_checks.py`、`tests/visualization/test_charts.py`、`tests/visualization/test_navigation.py`；随后执行 `py -3.13 -m ruff check src tests app scripts`。它明确排除 `tests/sql`、`tests/ingestion`、`tests/agent/test_evaluation.py` 及 bootstrap/load/build 入口，保留 600 秒有限超时；直接入口集成只运行 `--help`。无写入结论只适用于当前清单，任何增删都必须重新审计默认数据库、真实制品和入口副作用。
 - `--require-source-data` 额外要求 `data/raw/` 中九份 CSV 均存在，面向准备从零重建的环境。
 
-失败信息必须说明失败层级和下一步命令。缺 schema 先提示 `bootstrap_db.py`；raw/source 层再指向 `data/README.md` 与 `load_raw.py --data-dir data/raw`；staging/warehouse 层提示 `build_warehouse.py`；只有 schema 均存在而 marts 表缺失时才提示 `build_marts.py`。缺失模型或评测产物提示对应训练或 fake 评测命令。脚本不泄露数据库密码、LLM Key 或完整连接串。
+失败信息必须说明失败层级和下一步命令。缺 schema 先提示 `bootstrap_db.py`；缺 raw 必需表时指向 `data/README.md` 与 `load_raw.py --data-dir data/raw`；缺 warehouse 必需表时提示 `build_warehouse.py`；只有 raw 与 warehouse 必需表均就绪而 marts 表缺失时才提示 `build_marts.py`。缺失模型或评测产物提示对应训练或 fake 评测命令。脚本不泄露数据库密码、LLM Key 或完整连接串。
 
 四个产物采用 `generated-after-clone` 策略。仓库跟踪 `artifacts/manifest.json`，逐项声明路径、精确生成命令和前置条件；端到端源码验收验证 manifest，不要求干净 checkout 已存在被忽略的运行时输出。运行时 verifier 仍要求实际产物可用。
 

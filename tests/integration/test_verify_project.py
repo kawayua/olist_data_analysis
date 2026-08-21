@@ -5,13 +5,13 @@ import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
 import pytest
 
 import scripts.verify_project as verifier
 from scripts.verify_project import (
     REQUIRED_ARTIFACTS,
-    REQUIRED_MARTS,
     REQUIRED_RAW_FILES,
     REQUIRED_SCHEMAS,
     VerificationDependencies,
@@ -26,7 +26,38 @@ class FakeDependencies:
         self.docker_ok = True
         self.database_ok = True
         self.schemas = set(REQUIRED_SCHEMAS)
-        self.marts = set(REQUIRED_MARTS)
+        self.raw_tables = {
+            "customers",
+            "orders",
+            "order_items",
+            "reviews",
+            "payments",
+            "products",
+        }
+        self.warehouse_tables = {
+            "fact_orders",
+            "fact_order_items",
+            "fact_reviews",
+            "dim_customer",
+            "dim_product",
+        }
+        self.marts = {
+            "monthly_growth",
+            "cohort_retention",
+            "repurchase_horizons",
+            "customer_360",
+            "customer_segment_strategy",
+            "product_performance",
+            "delivery_experience",
+            "ml_customer_features",
+            "delivery_order_analysis",
+            "state_performance",
+            "customer_value_analysis",
+            "repurchase_behavior",
+            "repurchase_intervals",
+            "delivery_rating_analysis",
+            "state_monthly_performance",
+        }
         self.env_tracked = False
         self.env_ignored = True
         self.commands: list[tuple[str, ...]] = []
@@ -40,6 +71,12 @@ class FakeDependencies:
 
     def available_schemas(self) -> set[str]:
         return self.schemas
+
+    def available_raw_tables(self) -> set[str]:
+        return self.raw_tables
+
+    def available_warehouse_tables(self) -> set[str]:
+        return self.warehouse_tables
 
     def available_marts(self) -> set[str]:
         return self.marts
@@ -55,16 +92,7 @@ class FakeDependencies:
         return self.command_results.pop(0) if self.command_results else True
 
     def dependencies(self) -> VerificationDependencies:
-        return VerificationDependencies(
-            root=self.root,
-            docker_available=self.docker_available,
-            database_ready=self.database_ready,
-            available_schemas=self.available_schemas,
-            available_marts=self.available_marts,
-            is_env_tracked=self.is_env_tracked,
-            is_env_ignored=self.is_env_ignored,
-            run_command=self.run_command,
-        )
+        return cast(VerificationDependencies, self)
 
 
 @pytest.fixture
@@ -189,7 +217,7 @@ def test_verification_reports_database_failure(healthy_dependencies: FakeDepende
                 "scripts/load_raw.py --data-dir data/raw",
             ),
         ),
-        ("staging", ("scripts/bootstrap_db.py", "scripts/build_warehouse.py")),
+        ("staging", ("scripts/bootstrap_db.py",)),
         ("warehouse", ("scripts/bootstrap_db.py", "scripts/build_warehouse.py")),
         ("marts", ("scripts/bootstrap_db.py", "scripts/build_marts.py")),
     ],
@@ -211,17 +239,102 @@ def test_verification_routes_schema_recovery_by_layer(
     assert all(command in message for command in expected_commands)
 
 
-def test_verification_reports_missing_mart(healthy_dependencies: FakeDependencies) -> None:
-    healthy_dependencies.marts.remove("customer_360")
+@pytest.mark.parametrize(
+    ("missing_layer", "missing_table", "expected_message", "forbidden_command"),
+    [
+        (
+            "raw",
+            "customers",
+            (
+                "Missing raw source tables: customers. See data/README.md, then run "
+                "py -3.13 scripts/load_raw.py --data-dir data/raw."
+            ),
+            "scripts/build_marts.py",
+        ),
+        (
+            "warehouse",
+            "fact_orders",
+            (
+                "Missing warehouse tables: fact_orders. "
+                "Run py -3.13 scripts/build_warehouse.py."
+            ),
+            "scripts/build_marts.py",
+        ),
+        (
+            "marts",
+            "customer_360",
+            "Missing marts: customer_360. Run py -3.13 scripts/build_marts.py.",
+            None,
+        ),
+        (
+            "marts",
+            "repurchase_horizons",
+            "Missing marts: repurchase_horizons. Run py -3.13 scripts/build_marts.py.",
+            None,
+        ),
+        (
+            "marts",
+            "customer_segment_strategy",
+            (
+                "Missing marts: customer_segment_strategy. "
+                "Run py -3.13 scripts/build_marts.py."
+            ),
+            None,
+        ),
+        (
+            "marts",
+            "customer_value_analysis",
+            (
+                "Missing marts: customer_value_analysis. "
+                "Run py -3.13 scripts/build_marts.py."
+            ),
+            None,
+        ),
+        (
+            "marts",
+            "repurchase_behavior",
+            "Missing marts: repurchase_behavior. Run py -3.13 scripts/build_marts.py.",
+            None,
+        ),
+        (
+            "marts",
+            "repurchase_intervals",
+            "Missing marts: repurchase_intervals. Run py -3.13 scripts/build_marts.py.",
+            None,
+        ),
+        (
+            "marts",
+            "delivery_rating_analysis",
+            (
+                "Missing marts: delivery_rating_analysis. "
+                "Run py -3.13 scripts/build_marts.py."
+            ),
+            None,
+        ),
+    ],
+)
+def test_verification_routes_missing_tables_by_readiness_layer(
+    healthy_dependencies: FakeDependencies,
+    missing_layer: str,
+    missing_table: str,
+    expected_message: str,
+    forbidden_command: str | None,
+) -> None:
+    layer_tables = {
+        "raw": healthy_dependencies.raw_tables,
+        "warehouse": healthy_dependencies.warehouse_tables,
+        "marts": healthy_dependencies.marts,
+    }
+    layer_tables[missing_layer].remove(missing_table)
 
     result = verify_project(
         healthy_dependencies.dependencies(), require_source_data=False, full=False
     )
 
     assert result.ok is False
-    assert result.messages == (
-        "Missing marts: customer_360. Run py -3.13 scripts/build_marts.py.",
-    )
+    assert result.messages == (expected_message,)
+    if forbidden_command is not None:
+        assert forbidden_command not in "\n".join(result.messages)
 
 
 def test_verification_reports_missing_artifact(healthy_dependencies: FakeDependencies) -> None:
@@ -389,19 +502,26 @@ def test_full_verification_runs_only_explicit_safe_test_paths(
             "-m",
             "pytest",
             "-v",
-            "tests/agent",
-            "tests/analytics",
-            "tests/ingestion",
-            "tests/integration",
-            "tests/ml",
-            "tests/validation",
-            "tests/visualization",
+            "tests/test_config.py",
+            "tests/agent/test_client.py",
+            "tests/analytics/test_metrics.py",
+            "tests/analytics/test_retention.py",
+            "tests/analytics/test_segmentation.py",
+            "tests/analytics/test_statistics.py",
+            "tests/integration/test_end_to_end.py",
+            "tests/integration/test_verify_project.py",
+            "tests/ml/test_roi.py",
+            "tests/validation/test_checks.py",
+            "tests/visualization/test_charts.py",
+            "tests/visualization/test_navigation.py",
         ),
         ("py", "-3.13", "-m", "ruff", "check", "src", "tests", "app", "scripts"),
     ]
     pytest_command = healthy_dependencies.commands[0]
     forbidden = (
         "tests/sql",
+        "tests/ingestion",
+        "tests/agent/test_evaluation.py",
         "build_marts.py",
         "build_warehouse.py",
         "bootstrap_db.py",

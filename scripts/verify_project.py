@@ -18,13 +18,34 @@ REQUIRED_SCHEMAS = ("raw", "staging", "warehouse", "marts")
 REQUIRED_MARTS = (
     "monthly_growth",
     "cohort_retention",
+    "repurchase_horizons",
     "customer_360",
+    "customer_segment_strategy",
     "product_performance",
     "delivery_experience",
     "delivery_order_analysis",
     "state_performance",
+    "customer_value_analysis",
+    "repurchase_behavior",
+    "repurchase_intervals",
+    "delivery_rating_analysis",
     "state_monthly_performance",
     "ml_customer_features",
+)
+REQUIRED_RAW_TABLES = (
+    "customers",
+    "orders",
+    "order_items",
+    "reviews",
+    "payments",
+    "products",
+)
+REQUIRED_WAREHOUSE_TABLES = (
+    "fact_orders",
+    "fact_order_items",
+    "fact_reviews",
+    "dim_customer",
+    "dim_product",
 )
 REQUIRED_ARTIFACTS = (
     "artifacts/quality/latest.json",
@@ -50,13 +71,18 @@ FULL_COMMANDS = (
         "-m",
         "pytest",
         "-v",
-        "tests/agent",
-        "tests/analytics",
-        "tests/ingestion",
-        "tests/integration",
-        "tests/ml",
-        "tests/validation",
-        "tests/visualization",
+        "tests/test_config.py",
+        "tests/agent/test_client.py",
+        "tests/analytics/test_metrics.py",
+        "tests/analytics/test_retention.py",
+        "tests/analytics/test_segmentation.py",
+        "tests/analytics/test_statistics.py",
+        "tests/integration/test_end_to_end.py",
+        "tests/integration/test_verify_project.py",
+        "tests/ml/test_roi.py",
+        "tests/validation/test_checks.py",
+        "tests/visualization/test_charts.py",
+        "tests/visualization/test_navigation.py",
     ),
     ("py", "-3.13", "-m", "ruff", "check", "src", "tests", "app", "scripts"),
 )
@@ -80,6 +106,8 @@ class VerificationDependencies:
     docker_available: Callable[[], bool]
     database_ready: Callable[[], bool]
     available_schemas: Callable[[], set[str]]
+    available_raw_tables: Callable[[], set[str]]
+    available_warehouse_tables: Callable[[], set[str]]
     available_marts: Callable[[], set[str]]
     is_env_tracked: Callable[[], bool]
     is_env_ignored: Callable[[], bool]
@@ -133,6 +161,18 @@ def default_dependencies(root: Path = PROJECT_ROOT) -> VerificationDependencies:
             "WHERE table_schema = 'marts'"
         ) or set()
 
+    def available_raw_tables() -> set[str]:
+        return _database_observation(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'raw'"
+        ) or set()
+
+    def available_warehouse_tables() -> set[str]:
+        return _database_observation(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'warehouse'"
+        ) or set()
+
     return VerificationDependencies(
         root=root,
         docker_available=lambda: _run_quietly(
@@ -140,6 +180,8 @@ def default_dependencies(root: Path = PROJECT_ROOT) -> VerificationDependencies:
         ),
         database_ready=database_ready,
         available_schemas=available_schemas,
+        available_raw_tables=available_raw_tables,
+        available_warehouse_tables=available_warehouse_tables,
         available_marts=available_marts,
         is_env_tracked=lambda: _run_quietly(
             ("git", "ls-files", "--error-unmatch", ".env"), cwd=root, timeout=15
@@ -157,20 +199,6 @@ def _artifact_guidance(relative_path: str) -> str:
     if relative_path == "artifacts/agent/evaluation.json":
         return "Run py -3.13 scripts/evaluate_agent.py --mode fake to recreate it."
     return "Run py -3.13 scripts/run_quality_checks.py to recreate the quality artifact."
-
-
-def _schema_recovery_guidance(missing_schemas: Sequence[str]) -> str:
-    steps = ["Run py -3.13 scripts/bootstrap_db.py."]
-    if "raw" in missing_schemas:
-        steps.append(
-            "Then see data/README.md and run "
-            "py -3.13 scripts/load_raw.py --data-dir data/raw."
-        )
-    if {"staging", "warehouse"}.intersection(missing_schemas):
-        steps.append("Then run py -3.13 scripts/build_warehouse.py.")
-    if "marts" in missing_schemas:
-        steps.append("Then run py -3.13 scripts/build_marts.py.")
-    return " ".join(steps)
 
 
 def _artifact_is_readable(artifact: Path) -> bool:
@@ -205,15 +233,46 @@ def verify_project(
     if not dependencies.database_ready():
         messages.append("Database check failed. Run docker compose up -d after Docker Desktop is ready.")
     else:
-        missing_schemas = sorted(set(REQUIRED_SCHEMAS) - dependencies.available_schemas())
+        available_schemas = dependencies.available_schemas()
+        missing_schemas = sorted(set(REQUIRED_SCHEMAS) - available_schemas)
         if missing_schemas:
             messages.append(
                 "Missing database schemas: "
                 f"{', '.join(missing_schemas)}. "
-                f"{_schema_recovery_guidance(missing_schemas)}"
+                "Run py -3.13 scripts/bootstrap_db.py."
             )
-        else:
-            missing_marts = sorted(set(REQUIRED_MARTS) - dependencies.available_marts())
+
+        available_raw_tables = (
+            dependencies.available_raw_tables() if "raw" in available_schemas else set()
+        )
+        missing_raw_tables = sorted(set(REQUIRED_RAW_TABLES) - available_raw_tables)
+        if missing_raw_tables:
+            messages.append(
+                "Missing raw source tables: "
+                f"{', '.join(missing_raw_tables)}. See data/README.md, then run "
+                "py -3.13 scripts/load_raw.py --data-dir data/raw."
+            )
+
+        available_warehouse_tables = (
+            dependencies.available_warehouse_tables()
+            if "warehouse" in available_schemas
+            else set()
+        )
+        missing_warehouse_tables = sorted(
+            set(REQUIRED_WAREHOUSE_TABLES) - available_warehouse_tables
+        )
+        if missing_warehouse_tables:
+            messages.append(
+                "Missing warehouse tables: "
+                f"{', '.join(missing_warehouse_tables)}. "
+                "Run py -3.13 scripts/build_warehouse.py."
+            )
+
+        if not missing_raw_tables and not missing_warehouse_tables:
+            available_marts = (
+                dependencies.available_marts() if "marts" in available_schemas else set()
+            )
+            missing_marts = sorted(set(REQUIRED_MARTS) - available_marts)
             if missing_marts:
                 messages.append(
                     "Missing marts: "

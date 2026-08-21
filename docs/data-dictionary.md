@@ -68,10 +68,10 @@
 | `product_performance` | 每商品品类；`product_category` | orders/items/products/reviews/customer_360 | 订单/客户、商品/运费金额、延迟、评分、90 天复购 |
 | `delivery_experience` | 每履约状态；`delivery_status` | delivered orders/reviews/customer_360 | late/on_time、配送天数、评分、90 天复购 |
 | `delivery_order_analysis` | 每已送达订单；`order_id` | orders/reviews/customer_360 | 履约、评分、首购资格和复购标签 |
-| `delivery_rating_analysis` | 履约状态 × 评分；复合键 | delivery order analysis | 评分计数与分布分析字段 |
-| `state_performance` | 每客户州；`customer_state` | delivered orders + raw customers + reviews | 订单/客户、金额、延迟、配送、评分、90 天复购 |
-| `state_monthly_performance` | 州 × 月；复合键 | state performance 来源 | 月度订单、客户、金额、履约与评分 |
-| `customer_value_analysis` | 客户分群；`customer_segment` | customer_360 | 客户数、金额、贡献、策略字段 |
+| `delivery_rating_analysis` | 每配送延迟桶一行；`delivery_delay_bucket` | `warehouse.fact_orders` + `warehouse.fact_reviews` | 订单数、相对预计送达天数均值、评分均值 |
+| `state_performance` | 每客户州；`customer_state` | delivered `warehouse.fact_orders` + `raw.customers` + `warehouse.fact_reviews` + `marts.customer_360` | 订单/客户、商品/支付金额、商品金额 AOV、延迟、配送、评分、90 天复购 |
+| `state_monthly_performance` | 每自然月 × 客户州；(`month_start`, `customer_state`) | delivered `warehouse.fact_orders` + `raw.customers` | 订单/客户、商品/支付金额、两种 AOV、完整月标记 |
+| `customer_value_analysis` | 每客户分群一行；`customer_segment` | `marts.customer_360` | 客户数、商品金额与占比、RFM 均值、首购/二购/多购客户及金额 |
 | `repurchase_behavior` | 首购品类 × 天数窗口；(`first_purchase_category`, `horizon_days`) | delivered orders/items/products | 资格、复购、30/60/90 天比例 |
 | `repurchase_intervals` | 复购间隔桶；`interval_bucket` | delivered orders | 0–30 至 181+ 天客户数 |
 | `ml_customer_features` | 每客户；`customer_key` | 首笔已送达订单及其商品 | prediction time、六个首单特征、观察终点、资格、90 天标签 |

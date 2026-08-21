@@ -14,7 +14,7 @@
 
 - Docker runs PostgreSQL only; Streamlit starts with `py -3.13 -m streamlit run app/Home.py --server.port 8501`.
 - Default verification must not download CSVs, mutate data, build marts, train models, or invoke LLMs.
-- `--full` runs pytest only against the explicit non-database directories `tests/agent tests/analytics tests/ingestion tests/integration tests/ml tests/validation tests/visualization`, then runs `py -3.13 -m ruff check src tests app scripts`; it never includes `tests/sql` or a build/bootstrap/load entrypoint.
+- `--full` runs pytest with `-v` only against the 12 exact files audited in `scripts/verify_project.py::FULL_COMMANDS`, then runs `py -3.13 -m ruff check src tests app scripts`. The current list excludes `tests/sql`, `tests/ingestion`, `tests/agent/test_evaluation.py`, and build/bootstrap/load entrypoints, and keeps a finite 600-second timeout. This is a snapshot-specific side-effect audit, not a claim that arbitrary tests are non-writing; list changes require re-audit.
 - Raw CSVs are never committed; require all nine only with `--require-source-data`.
 - Never print credentials, API keys or connection URLs. `.env` stays ignored.
 - `POSTGRES_VOLUME_NAME` defaults to `data_analysis_postgres_data`; a local override can attach an existing volume.
@@ -95,11 +95,27 @@ def test_database_failure_has_safe_compose_recovery(tmp_path):
 def test_full_mode_runs_exact_commands_after_health(tmp_path):
     deps = passing_dependencies(project_root=tmp_path)
     assert verify_project(deps, require_source_data=False, full=True).ok
-    assert deps.commands[0] == ("py", "-3.13", "-m", "pytest", "-v", "tests/agent", "tests/analytics", "tests/ingestion", "tests/integration", "tests/ml", "tests/validation", "tests/visualization")
+    assert deps.commands[0] == (
+        "py", "-3.13", "-m", "pytest", "-v",
+        "tests/test_config.py",
+        "tests/agent/test_client.py",
+        "tests/analytics/test_metrics.py",
+        "tests/analytics/test_retention.py",
+        "tests/analytics/test_segmentation.py",
+        "tests/analytics/test_statistics.py",
+        "tests/integration/test_end_to_end.py",
+        "tests/integration/test_verify_project.py",
+        "tests/ml/test_roi.py",
+        "tests/validation/test_checks.py",
+        "tests/visualization/test_charts.py",
+        "tests/visualization/test_navigation.py",
+    )
     assert "tests/sql" not in deps.commands[0]
+    assert "tests/ingestion" not in deps.commands[0]
+    assert "tests/agent/test_evaluation.py" not in deps.commands[0]
 ```
 
-Add sibling tests for Docker unavailable, missing schema/mart/artifact, tracked `.env`, one absent raw CSV under `--require-source-data`, and a failed full command. Each must assert its exact safe recovery guidance.
+Add sibling tests for Docker unavailable, missing schema/raw table/warehouse table/mart/artifact, tracked `.env`, one absent raw CSV under `--require-source-data`, and a failed full command. Observe the six raw source tables and five warehouse tables required by mart SQL; suggest `build_marts.py` only after both upstream sets are ready. Each test must assert its exact safe recovery guidance. Direct-entry integration uses `--help` only.
 
 - [ ] **Step 2: Verify RED**
 
@@ -236,6 +252,6 @@ Commit: `git add docs/retrospectives/final.md docs/learning/week-2.md tests/inte
 
 - [ ] Default verification does not mutate data/model/LLM state.
 - [ ] Full verification makes no live LLM request.
-- [ ] Explicit non-database pytest directories and Ruff pass; `tests/sql` remains developer-only and isolated from readiness verification.
+- [ ] Audited exact pytest files and Ruff pass; `tests/sql`, `tests/ingestion`, and `tests/agent/test_evaluation.py` remain outside readiness verification, and the reviewed boundary is not generalized to arbitrary tests.
 - [ ] `.env` is ignored and untracked.
 - [ ] Rendered README covers startup, volume override, raw data recovery and live-model limits.

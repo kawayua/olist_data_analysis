@@ -108,6 +108,28 @@ def test_data_dictionary_matches_mart_grain_key_and_source_contracts() -> None:
         "`monthly_growth` | 每自然月；`month_start` | delivered "
         "`warehouse.fact_orders` + `warehouse.fact_reviews`"
     ) in content
+    assert (
+        "`delivery_rating_analysis` | 每配送延迟桶一行；`delivery_delay_bucket` | "
+        "`warehouse.fact_orders` + `warehouse.fact_reviews` | "
+        "订单数、相对预计送达天数均值、评分均值"
+    ) in content
+    assert (
+        "`state_monthly_performance` | 每自然月 × 客户州；"
+        "(`month_start`, `customer_state`) | delivered "
+        "`warehouse.fact_orders` + `raw.customers` | "
+        "订单/客户、商品/支付金额、两种 AOV、完整月标记"
+    ) in content
+    assert (
+        "`state_performance` | 每客户州；`customer_state` | delivered "
+        "`warehouse.fact_orders` + `raw.customers` + `warehouse.fact_reviews` + "
+        "`marts.customer_360` | 订单/客户、商品/支付金额、商品金额 AOV、"
+        "延迟、配送、评分、90 天复购"
+    ) in content
+    assert (
+        "`customer_value_analysis` | 每客户分群一行；`customer_segment` | "
+        "`marts.customer_360` | 客户数、商品金额与占比、RFM 均值、"
+        "首购/二购/多购客户及金额"
+    ) in content
 
 
 def test_day20_final_retrospective_records_acceptance_results() -> None:
@@ -122,8 +144,8 @@ def test_day20_retrospective_states_non_destructive_acceptance_boundary() -> Non
     content = Path("docs/retrospectives/final.md").read_text(encoding="utf-8")
 
     assert "tests/sql" in content
-    assert "非 SQL 测试目录" in content
-    assert "non-SQL test directories" in content
+    assert "经审计的精确测试文件" in content
+    assert "audited exact test files" in content
 
 
 def test_day20_retrospective_invalidates_the_old_broad_pytest_evidence() -> None:
