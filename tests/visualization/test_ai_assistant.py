@@ -39,3 +39,9 @@ def test_navigation_includes_ai_assistant_page():
     from app.components.navigation import NAVIGATION_PAGES
 
     assert ("pages/7_AI分析助手.py", "AI分析助手") in NAVIGATION_PAGES
+
+
+def test_ai_assistant_allows_monthly_state_performance_queries():
+    page = _load_page_module()
+
+    assert "marts.state_monthly_performance" in page.ALLOWED_AGENT_VIEWS

@@ -38,6 +38,7 @@ ALLOWED_AGENT_VIEWS = {
     "marts.delivery_rating_analysis",
     "marts.repurchase_behavior",
     "marts.state_performance",
+    "marts.state_monthly_performance",
 }
 
 

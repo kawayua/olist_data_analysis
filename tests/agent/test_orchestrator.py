@@ -99,6 +99,7 @@ def test_agent_gives_model_safe_correction_hints_for_metric_and_sql_failures():
     assert answer.answer == "已说明限制"
     assert "item_revenue" in client.seen_messages[0][0]["content"]
     assert "marts.state_performance" in client.seen_messages[0][0]["content"]
+    assert "marts.state_monthly_performance" in client.seen_messages[0][0]["content"]
 
 
 def _definition(name: str) -> ToolDefinition:

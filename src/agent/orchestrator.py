@@ -115,6 +115,8 @@ class AnalysisAgent:
                     "item_revenue_aov、new_customers、returning_customers、"
                     "repeat_rate_30d、repeat_rate_60d、repeat_rate_90d、late_delivery_rate。"
                     "州维度销售额使用 marts.state_performance 的 customer_state 与 item_revenue；"
+                    "州维度且指定月份范围的销售额使用 marts.state_monthly_performance 的 "
+                    "month_start、customer_state 与 item_revenue；"
                     "先取得一次受控查询结果，再直接给出结论，不要重复相同调用。"
                 ),
             },

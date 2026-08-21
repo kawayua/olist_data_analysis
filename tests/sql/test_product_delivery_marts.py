@@ -203,6 +203,81 @@ def test_state_performance_exposes_delivery_and_review_metrics():
     assert invalid_buckets == 0
 
 
+def test_state_monthly_performance_has_governed_grain_and_reconciles():
+    project_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "scripts/build_marts.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Applied sql/marts/040_state_monthly_performance.sql" in result.stdout
+
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        (
+            rows,
+            duplicates,
+            invalid_aov,
+            inconsistent_complete_flags,
+            monthly_reconciliation_difference,
+            state_reconciliation_difference,
+        ) = connection.execute(
+            text(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM marts.state_monthly_performance),
+                    (
+                        SELECT COUNT(*) - COUNT(DISTINCT (month_start, customer_state))
+                        FROM marts.state_monthly_performance
+                    ),
+                    (
+                        SELECT COUNT(*)
+                        FROM marts.state_monthly_performance
+                        WHERE item_revenue_aov < 0
+                           OR payment_aov < 0
+                    ),
+                    (
+                        SELECT COUNT(*)
+                        FROM marts.state_monthly_performance AS state_monthly
+                        JOIN marts.monthly_growth AS monthly
+                            USING (month_start)
+                        WHERE state_monthly.is_complete_month
+                            IS DISTINCT FROM monthly.is_complete_month
+                    ),
+                    (
+                        SELECT ABS(
+                            (SELECT SUM(item_revenue)
+                             FROM marts.state_monthly_performance)
+                            -
+                            (SELECT SUM(item_revenue)
+                             FROM marts.monthly_growth)
+                        )
+                    ),
+                    (
+                        SELECT ABS(
+                            (SELECT SUM(item_revenue)
+                             FROM marts.state_monthly_performance)
+                            -
+                            (SELECT SUM(item_revenue)
+                             FROM marts.state_performance)
+                        )
+                    )
+                """
+            )
+        ).one()
+
+    assert rows > 0
+    assert duplicates == 0
+    assert invalid_aov == 0
+    assert inconsistent_complete_flags == 0
+    assert monthly_reconciliation_difference == 0
+    assert state_reconciliation_difference == 0
+
+
 def test_product_performance_exposes_average_review_score():
     project_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
