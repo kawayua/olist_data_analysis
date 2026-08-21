@@ -175,8 +175,12 @@ def test_verification_reports_missing_artifact(healthy_dependencies: FakeDepende
     )
 
     assert result.ok is False
-    assert any(REQUIRED_ARTIFACTS[0] in message for message in result.messages)
-    assert any("quality workflow" in message.lower() for message in result.messages)
+    assert result.messages == (
+        (
+            "Missing or unreadable artifacts/quality/latest.json. "
+            "Run py -3.13 scripts/run_quality_checks.py to recreate the quality artifact."
+        ),
+    )
 
 
 @pytest.mark.parametrize(

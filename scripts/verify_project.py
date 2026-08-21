@@ -136,7 +136,7 @@ def _artifact_guidance(relative_path: str) -> str:
         return "Run py -3.13 scripts/train_model.py to recreate model artifacts."
     if relative_path == "artifacts/agent/evaluation.json":
         return "Run py -3.13 scripts/evaluate_agent.py --mode fake to recreate it."
-    return "Run the quality workflow to recreate the quality artifact."
+    return "Run py -3.13 scripts/run_quality_checks.py to recreate the quality artifact."
 
 
 def verify_project(
