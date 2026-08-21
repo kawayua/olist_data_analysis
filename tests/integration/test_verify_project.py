@@ -11,6 +11,7 @@ from scripts.verify_project import (
     REQUIRED_RAW_FILES,
     REQUIRED_SCHEMAS,
     VerificationDependencies,
+    main,
     verify_project,
 )
 
@@ -79,6 +80,28 @@ def test_healthy_default_verification_avoids_full_commands(
     assert healthy_dependencies.commands == []
 
 
+def test_cli_returns_zero_for_healthy_dependencies(
+    healthy_dependencies: FakeDependencies, capsys: pytest.CaptureFixture[str]
+) -> None:
+    exit_code = main([], dependencies=healthy_dependencies.dependencies())
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == "Project readiness checks passed.\n"
+
+
+def test_cli_returns_one_for_failed_dependencies(
+    healthy_dependencies: FakeDependencies, capsys: pytest.CaptureFixture[str]
+) -> None:
+    healthy_dependencies.docker_ok = False
+
+    exit_code = main([], dependencies=healthy_dependencies.dependencies())
+
+    assert exit_code == 1
+    assert capsys.readouterr().out == (
+        "Docker is unavailable. Start Docker Desktop, then run docker compose up -d.\n"
+    )
+
+
 def test_verification_reports_docker_failure(healthy_dependencies: FakeDependencies) -> None:
     healthy_dependencies.docker_ok = False
 
@@ -121,7 +144,9 @@ def test_verification_reports_missing_mart(healthy_dependencies: FakeDependencie
     )
 
     assert result.ok is False
-    assert any("customer_360" in message for message in result.messages)
+    assert result.messages == (
+        "Missing marts: customer_360. Run py -3.13 scripts/build_marts.py.",
+    )
 
 
 def test_verification_reports_missing_artifact(healthy_dependencies: FakeDependencies) -> None:
@@ -134,6 +159,39 @@ def test_verification_reports_missing_artifact(healthy_dependencies: FakeDepende
     assert result.ok is False
     assert any(REQUIRED_ARTIFACTS[0] in message for message in result.messages)
     assert any("quality workflow" in message.lower() for message in result.messages)
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "expected_message"),
+    [
+        (
+            "artifacts/models/repurchase_pipeline.joblib",
+            (
+                "Missing or unreadable artifacts/models/repurchase_pipeline.joblib. "
+                "Run py -3.13 scripts/train_model.py to recreate model artifacts."
+            ),
+        ),
+        (
+            "artifacts/agent/evaluation.json",
+            (
+                "Missing or unreadable artifacts/agent/evaluation.json. "
+                "Run py -3.13 scripts/evaluate_agent.py --mode fake to recreate it."
+            ),
+        ),
+    ],
+)
+def test_verification_provides_exact_artifact_recovery_guidance(
+    healthy_dependencies: FakeDependencies,
+    relative_path: str,
+    expected_message: str,
+) -> None:
+    (healthy_dependencies.root / relative_path).unlink()
+
+    result = verify_project(
+        healthy_dependencies.dependencies(), require_source_data=False, full=False
+    )
+
+    assert result.messages == (expected_message,)
 
 
 def test_verification_reports_tracked_environment_file(
@@ -160,6 +218,16 @@ def test_strict_verification_reports_missing_raw_file(
     assert result.ok is False
     assert any(REQUIRED_RAW_FILES[0] in message for message in result.messages)
     assert any("data/README.md" in message for message in result.messages)
+    assert result.messages == (
+        (
+            "Missing required source data: olist_customers_dataset.csv, "
+            "olist_orders_dataset.csv, olist_order_items_dataset.csv, "
+            "olist_order_payments_dataset.csv, olist_order_reviews_dataset.csv, "
+            "olist_products_dataset.csv, olist_sellers_dataset.csv, "
+            "olist_geolocation_dataset.csv, product_category_name_translation.csv. "
+            "See data/README.md."
+        ),
+    )
 
 
 def test_full_verification_reports_failed_command(

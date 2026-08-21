@@ -203,7 +203,11 @@ def verify_project(
     return VerificationResult(ok=True, messages=("Project readiness checks passed.",))
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    dependencies: VerificationDependencies | None = None,
+) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--full", action="store_true", help="also run tests and Ruff")
     parser.add_argument(
@@ -213,7 +217,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     result = verify_project(
-        default_dependencies(),
+        dependencies or default_dependencies(),
         require_source_data=args.require_source_data,
         full=args.full,
     )
