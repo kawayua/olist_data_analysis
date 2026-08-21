@@ -55,3 +55,11 @@ def test_portfolio_documents_cover_local_reproduction_and_evidence() -> None:
         content = Path(document).read_text(encoding="utf-8")
         assert "后续已送达订单的 `purchased_at`" in content
         assert "later delivered order's `purchased_at`" in content
+
+
+def test_day20_final_retrospective_records_acceptance_results() -> None:
+    content = Path("docs/retrospectives/final.md").read_text(encoding="utf-8")
+
+    assert "## Day 20 验收记录 / Day 20 acceptance record" in content
+    assert "verify_project.py --full" in content
+    assert "不调用真实" in content
