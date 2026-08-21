@@ -71,7 +71,7 @@ class VerificationDependencies:
     run_command: Callable[[Sequence[str]], bool]
 
 
-def _run_quietly(command: Sequence[str], *, cwd: Path) -> bool:
+def _run_quietly(command: Sequence[str], *, cwd: Path, timeout: int = 15) -> bool:
     try:
         completed = subprocess.run(
             command,
@@ -79,7 +79,7 @@ def _run_quietly(command: Sequence[str], *, cwd: Path) -> bool:
             check=False,
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError):
         return False
@@ -120,14 +120,16 @@ def default_dependencies(root: Path = PROJECT_ROOT) -> VerificationDependencies:
 
     return VerificationDependencies(
         root=root,
-        docker_available=lambda: _run_quietly(("docker", "info"), cwd=root),
+        docker_available=lambda: _run_quietly(
+            ("docker", "info"), cwd=root, timeout=15
+        ),
         database_ready=database_ready,
         available_schemas=available_schemas,
         available_marts=available_marts,
         is_env_tracked=lambda: _run_quietly(
-            ("git", "ls-files", "--error-unmatch", ".env"), cwd=root
+            ("git", "ls-files", "--error-unmatch", ".env"), cwd=root, timeout=15
         ),
-        run_command=lambda command: _run_quietly(command, cwd=root),
+        run_command=lambda command: _run_quietly(command, cwd=root, timeout=600),
     )
 
 

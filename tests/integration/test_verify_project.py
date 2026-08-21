@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import scripts.verify_project as verifier
 from scripts.verify_project import (
     REQUIRED_ARTIFACTS,
     REQUIRED_MARTS,
@@ -80,6 +81,30 @@ def test_healthy_default_verification_avoids_full_commands(
     assert result.ok is True
     assert result.messages == ("Project readiness checks passed.",)
     assert healthy_dependencies.commands == []
+
+
+def test_default_full_commands_have_a_longer_timeout_than_observations(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[tuple[tuple[str, ...], int]] = []
+
+    def run_quietly(command: Sequence[str], *, cwd: Path, timeout: int) -> bool:
+        assert cwd == tmp_path
+        calls.append((tuple(command), timeout))
+        return True
+
+    monkeypatch.setattr(verifier, "_run_quietly", run_quietly)
+    dependencies = verifier.default_dependencies(tmp_path)
+
+    dependencies.docker_available()
+    dependencies.is_env_tracked()
+    dependencies.run_command(verifier.FULL_COMMANDS[0])
+
+    assert calls == [
+        (("docker", "info"), 15),
+        (("git", "ls-files", "--error-unmatch", ".env"), 15),
+        (("py", "-3.13", "-m", "pytest", "-v"), 600),
+    ]
 
 
 def test_cli_returns_zero_for_healthy_dependencies(
