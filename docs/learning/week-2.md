@@ -205,3 +205,9 @@ Day 19 的交付说明“Agent 能在严格边界内调用工具并留下证据�
 **English.** Root-cause investigation showed that `DuplicateTable` was test-process concurrency: the pytest descendant of the first `verify_project.py --full` had not ended when the second exact full pytest began, so two test processes rebuilt the mart concurrently. With a new ignored repository temporary directory and complete waits for pytest/`build_marts` descendants, the sequential rerun RED stage had 225 existing tests passing and only the new root-cause-record assertion failing, with no `DuplicateTable`; it should not be attributed to `build_marts.py`.
 
 **最终终态 / Final terminal state.** 串行绿灯阶段默认 verifier 通过，精确全量 pytest 为 226/226 通过（136.73 秒），Ruff 通过且无 `DuplicateTable`。`verify_project.py --full` 仍失败，因为其 15 秒 `_run_quietly` 上限小于完整套件的 136.73 秒；这不是测试或建表失败，Task4 未修改该 wrapper。 **English.** In the sequential GREEN stage, default verification passed, exact full pytest passed 226/226 in 136.73 seconds, and Ruff passed without `DuplicateTable`. `verify_project.py --full` still failed because its 15-second `_run_quietly` limit is shorter than the 136.73-second suite; this is neither a test nor mart-build failure, and Task4 did not change that wrapper.
+
+### 已解决的 full 验收超时 / Resolved full-verification timeout
+
+**中文。** `27114f6` 已修复上述历史超时。修复后，无并发测试进程的 `py -3.13 scripts/verify_project.py --full` 以 exit code 0 结束并打印 `Project readiness checks passed.`；内部 pytest 226/226 通过（136.73 秒），Ruff 通过。此结果取代旧的 `--full` 失败描述。
+
+**English.** `27114f6` resolved the preceding historical timeout. Afterwards, with no concurrent test process, `py -3.13 scripts/verify_project.py --full` exited 0 and printed `Project readiness checks passed.` Internal pytest passed 226/226 in 136.73 seconds and Ruff passed. This supersedes the old `--full` failure description.
