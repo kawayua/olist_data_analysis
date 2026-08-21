@@ -27,6 +27,10 @@ flowchart LR
 
 ## 时间安全的标签 / Observation-window-safe labels
 
+**中文。** 分析集市和 ML 有意保留两套不同用途的时间锚点。`customer_360` 以及复用其标签的商品/履约集市，以首购 `purchased_at` 为起点，并用 delivered 订单的数据终点 `MAX(purchased_at)` 判断 90 天观察完整性；这些 purchase-anchored 标签用于描述性业务指标。
+
+**English.** The analysis marts and ML intentionally retain two time anchors for different purposes. `customer_360`, plus the product and delivery marts that reuse its label, starts at first-purchase `purchased_at` and uses the delivered-order data-end `MAX(purchased_at)` to determine whether the 90-day window is complete. These purchase-anchored labels support descriptive business metrics.
+
 **中文。** 建模集市在首笔已送达订单的送达时间设定 `prediction_time` 和 `feature_available_at`。标签选择后续已送达订单，但窗口比较的是后续已送达订单的 `purchased_at` 是否在 `(prediction_time, prediction_time + 90 天]`，并要求数据观察终点已覆盖该窗口；它不以该后续订单的送达时间比较。否则 `eligible_for_90d = false`、标签为 NULL。时间切分为训练、选择、校准和最终测试，最终测试不参与选择。这样不使用未来订单、评论、最终 RFM 或最终累计消费等在预测时不可见的信息。
 
 **English.** The modeling mart sets `prediction_time` and `feature_available_at` at the delivery time of the first delivered order. The label selects a later delivered order, but compares that later delivered order's `purchased_at` with `(prediction_time, prediction_time + 90 days]` and requires the data observation end to cover that window; it does not compare that later order's delivery time. Otherwise `eligible_for_90d = false` and the label is NULL. Time is split into training, selection, calibration, and final test, and final test does not participate in selection. This avoids future orders, reviews, final RFM, or final cumulative spend that would be unavailable at prediction time.
@@ -39,6 +43,6 @@ flowchart LR
 
 ## 运行模式 / Operating modes
 
-**中文。** Docker Compose 仅运行 PostgreSQL；Streamlit 由本地 Python 3.13 启动。`verify_project.py` 的默认检查观察容器、模式、集市、产物和 Git 状态，不下载数据、不重建表、不训练模型、不启动 Streamlit、也不调用 LLM。完整模式只在健康检查后运行项目测试和 Ruff。恢复模式才依序 bootstrap、加载 raw、构建 warehouse/marts、运行 `py -3.13 scripts/run_quality_checks.py`、训练模型并执行 fake Agent 评估。质量报告入口读取现有数据库，并且只写入 `artifacts/quality/latest.json`，不重建数据层。
+**中文。** Docker Compose 仅运行 PostgreSQL；Streamlit 由本地 Python 3.13 启动。`verify_project.py` 的默认检查观察容器、模式、集市、产物和 Git 状态，不下载数据、不重建表、不训练模型、不启动 Streamlit、也不调用 LLM。完整模式只在健康检查后运行显式列出的非 SQL 测试目录和 Ruff，排除会重建当前数据库的 `tests/sql`。恢复模式才依序 bootstrap、加载 raw、构建 warehouse/marts、运行 `py -3.13 scripts/run_quality_checks.py`、训练模型并执行 fake Agent 评估。质量报告入口读取现有数据库，并且只写入 `artifacts/quality/latest.json`，不重建数据层。
 
-**English.** Docker Compose runs PostgreSQL only; Streamlit starts through local Python 3.13. The default `verify_project.py` check observes containers, schemas, marts, artifacts, and Git state; it does not download data, rebuild tables, train a model, start Streamlit, or call an LLM. Full mode runs project tests and Ruff only after health checks. Only restore mode runs bootstrap, raw loading, warehouse/mart building, `py -3.13 scripts/run_quality_checks.py`, model training, and fake Agent evaluation in sequence. The quality-report entrypoint reads the existing database and writes only `artifacts/quality/latest.json`; it does not rebuild a data layer.
+**English.** Docker Compose runs PostgreSQL only; Streamlit starts through local Python 3.13. The default `verify_project.py` check observes containers, schemas, marts, artifacts, and Git state; it does not download data, rebuild tables, train a model, start Streamlit, or call an LLM. Full mode runs only explicitly listed non-SQL test directories and Ruff after health checks, excluding `tests/sql`, which rebuilds the current database. Only restore mode runs bootstrap, raw loading, warehouse/mart building, `py -3.13 scripts/run_quality_checks.py`, model training, and fake Agent evaluation in sequence. The quality-report entrypoint reads the existing database and writes only `artifacts/quality/latest.json`; it does not rebuild a data layer.

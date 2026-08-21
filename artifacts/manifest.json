@@ -1,0 +1,25 @@
+{
+  "policy": "generated-after-clone",
+  "artifacts": [
+    {
+      "path": "artifacts/quality/latest.json",
+      "generation_command": "py -3.13 scripts/run_quality_checks.py",
+      "prerequisite": "Populated PostgreSQL warehouse and marts"
+    },
+    {
+      "path": "artifacts/models/repurchase_pipeline.joblib",
+      "generation_command": "py -3.13 scripts/train_model.py",
+      "prerequisite": "Populated marts.ml_customer_features"
+    },
+    {
+      "path": "artifacts/models/metrics.json",
+      "generation_command": "py -3.13 scripts/train_model.py",
+      "prerequisite": "Populated marts.ml_customer_features"
+    },
+    {
+      "path": "artifacts/agent/evaluation.json",
+      "generation_command": "py -3.13 scripts/evaluate_agent.py --mode fake",
+      "prerequisite": "Installed Python dependencies and configs/agent_questions.yml"
+    }
+  ]
+}

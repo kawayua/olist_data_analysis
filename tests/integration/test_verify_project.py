@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -27,6 +28,7 @@ class FakeDependencies:
         self.schemas = set(REQUIRED_SCHEMAS)
         self.marts = set(REQUIRED_MARTS)
         self.env_tracked = False
+        self.env_ignored = True
         self.commands: list[tuple[str, ...]] = []
         self.command_results: list[bool] = []
 
@@ -45,6 +47,9 @@ class FakeDependencies:
     def is_env_tracked(self) -> bool:
         return self.env_tracked
 
+    def is_env_ignored(self) -> bool:
+        return self.env_ignored
+
     def run_command(self, command: Sequence[str]) -> bool:
         self.commands.append(tuple(command))
         return self.command_results.pop(0) if self.command_results else True
@@ -57,6 +62,7 @@ class FakeDependencies:
             available_schemas=self.available_schemas,
             available_marts=self.available_marts,
             is_env_tracked=self.is_env_tracked,
+            is_env_ignored=self.is_env_ignored,
             run_command=self.run_command,
         )
 
@@ -67,7 +73,10 @@ def healthy_dependencies(tmp_path: Path) -> FakeDependencies:
     for relative_path in REQUIRED_ARTIFACTS:
         path = tmp_path / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("ready", encoding="utf-8")
+        if path.suffix == ".json":
+            path.write_text(json.dumps({"status": "ready"}), encoding="utf-8")
+        else:
+            path.write_bytes(b"joblib bundle placeholder")
     return dependencies
 
 
@@ -98,12 +107,14 @@ def test_default_full_commands_have_a_longer_timeout_than_observations(
 
     dependencies.docker_available()
     dependencies.is_env_tracked()
+    dependencies.is_env_ignored()
     dependencies.run_command(verifier.FULL_COMMANDS[0])
 
     assert calls == [
         (("docker", "info"), 15),
         (("git", "ls-files", "--error-unmatch", ".env"), 15),
-        (("py", "-3.13", "-m", "pytest", "-v"), 600),
+        (("git", "check-ignore", "--quiet", ".env"), 15),
+        (verifier.FULL_COMMANDS[0], 600),
     ]
 
 
@@ -131,7 +142,7 @@ def test_cli_returns_one_for_failed_dependencies(
 
 def test_direct_script_entrypoint_imports_project_modules_without_services() -> None:
     completed = subprocess.run(
-        (sys.executable, "scripts/verify_project.py"),
+        (sys.executable, "scripts/verify_project.py", "--help"),
         cwd=Path.cwd(),
         check=False,
         capture_output=True,
@@ -140,7 +151,7 @@ def test_direct_script_entrypoint_imports_project_modules_without_services() -> 
     )
 
     combined_output = completed.stdout + completed.stderr
-    assert completed.returncode in (0, 1)
+    assert completed.returncode == 0
     assert "ModuleNotFoundError" not in combined_output
     assert "Traceback" not in combined_output
 
@@ -167,16 +178,37 @@ def test_verification_reports_database_failure(healthy_dependencies: FakeDepende
     assert any("docker compose up -d" in message for message in result.messages)
 
 
-def test_verification_reports_missing_schema(healthy_dependencies: FakeDependencies) -> None:
-    healthy_dependencies.schemas.remove("warehouse")
+@pytest.mark.parametrize(
+    ("missing_schema", "expected_commands"),
+    [
+        (
+            "raw",
+            (
+                "scripts/bootstrap_db.py",
+                "data/README.md",
+                "scripts/load_raw.py --data-dir data/raw",
+            ),
+        ),
+        ("staging", ("scripts/bootstrap_db.py", "scripts/build_warehouse.py")),
+        ("warehouse", ("scripts/bootstrap_db.py", "scripts/build_warehouse.py")),
+        ("marts", ("scripts/bootstrap_db.py", "scripts/build_marts.py")),
+    ],
+)
+def test_verification_routes_schema_recovery_by_layer(
+    healthy_dependencies: FakeDependencies,
+    missing_schema: str,
+    expected_commands: tuple[str, ...],
+) -> None:
+    healthy_dependencies.schemas.remove(missing_schema)
 
     result = verify_project(
         healthy_dependencies.dependencies(), require_source_data=False, full=False
     )
 
     assert result.ok is False
-    assert any("warehouse" in message for message in result.messages)
-    assert any("build_marts.py" in message for message in result.messages)
+    message = "\n".join(result.messages)
+    assert missing_schema in message
+    assert all(command in message for command in expected_commands)
 
 
 def test_verification_reports_missing_mart(healthy_dependencies: FakeDependencies) -> None:
@@ -206,6 +238,41 @@ def test_verification_reports_missing_artifact(healthy_dependencies: FakeDepende
             "Run py -3.13 scripts/run_quality_checks.py to recreate the quality artifact."
         ),
     )
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "artifacts/quality/latest.json",
+        "artifacts/models/metrics.json",
+        "artifacts/agent/evaluation.json",
+    ],
+)
+def test_verification_rejects_corrupted_json_artifacts(
+    healthy_dependencies: FakeDependencies, relative_path: str
+) -> None:
+    (healthy_dependencies.root / relative_path).write_text("{broken", encoding="utf-8")
+
+    result = verify_project(
+        healthy_dependencies.dependencies(), require_source_data=False, full=False
+    )
+
+    assert result.ok is False
+    assert any(relative_path in message for message in result.messages)
+
+
+def test_verification_rejects_empty_artifact(
+    healthy_dependencies: FakeDependencies,
+) -> None:
+    relative_path = "artifacts/models/repurchase_pipeline.joblib"
+    (healthy_dependencies.root / relative_path).write_bytes(b"")
+
+    result = verify_project(
+        healthy_dependencies.dependencies(), require_source_data=False, full=False
+    )
+
+    assert result.ok is False
+    assert any(relative_path in message for message in result.messages)
 
 
 @pytest.mark.parametrize(
@@ -255,6 +322,21 @@ def test_verification_reports_tracked_environment_file(
     assert all("password" not in message.lower() for message in result.messages)
 
 
+def test_verification_reports_environment_file_that_is_not_ignored(
+    healthy_dependencies: FakeDependencies,
+) -> None:
+    healthy_dependencies.env_ignored = False
+
+    result = verify_project(
+        healthy_dependencies.dependencies(), require_source_data=False, full=False
+    )
+
+    assert result.ok is False
+    assert result.messages == (
+        ".env is not ignored by git; add it to .gitignore before delivery.",
+    )
+
+
 def test_strict_verification_reports_missing_raw_file(
     healthy_dependencies: FakeDependencies,
 ) -> None:
@@ -272,7 +354,8 @@ def test_strict_verification_reports_missing_raw_file(
             "olist_order_payments_dataset.csv, olist_order_reviews_dataset.csv, "
             "olist_products_dataset.csv, olist_sellers_dataset.csv, "
             "olist_geolocation_dataset.csv, product_category_name_translation.csv. "
-            "See data/README.md."
+            "See data/README.md, then run "
+            "py -3.13 scripts/load_raw.py --data-dir data/raw."
         ),
     )
 
@@ -288,10 +371,10 @@ def test_full_verification_reports_failed_command(
 
     assert result.ok is False
     assert any("pytest" in message for message in result.messages)
-    assert healthy_dependencies.commands == [("py", "-3.13", "-m", "pytest", "-v")]
+    assert healthy_dependencies.commands == [verifier.FULL_COMMANDS[0]]
 
 
-def test_full_verification_runs_the_exact_command_list(
+def test_full_verification_runs_only_explicit_safe_test_paths(
     healthy_dependencies: FakeDependencies,
 ) -> None:
     result = verify_project(
@@ -300,6 +383,28 @@ def test_full_verification_runs_the_exact_command_list(
 
     assert result.ok is True
     assert healthy_dependencies.commands == [
-        ("py", "-3.13", "-m", "pytest", "-v"),
+        (
+            "py",
+            "-3.13",
+            "-m",
+            "pytest",
+            "-v",
+            "tests/agent",
+            "tests/analytics",
+            "tests/ingestion",
+            "tests/integration",
+            "tests/ml",
+            "tests/validation",
+            "tests/visualization",
+        ),
         ("py", "-3.13", "-m", "ruff", "check", "src", "tests", "app", "scripts"),
     ]
+    pytest_command = healthy_dependencies.commands[0]
+    forbidden = (
+        "tests/sql",
+        "build_marts.py",
+        "build_warehouse.py",
+        "bootstrap_db.py",
+        "load_raw.py",
+    )
+    assert all(token not in pytest_command for token in forbidden)

@@ -20,11 +20,13 @@ Docker 只负责 PostgreSQL；Streamlit 使用本机 Python 3.13 运行。默认
 
 `scripts/verify_project.py` 提供两个模式。
 
-- 默认模式验证 Docker 引擎可用、PostgreSQL 可连接、`raw`、`staging`、`warehouse`、`marts` schema 存在、关键分析集市存在、质量报告/模型产物/Agent fake 评测产物可读取，并检查 `.env` 不会进入 Git。
-- `--full` 在默认检查通过后执行 `py -3.13 -m pytest -v` 与 `py -3.13 -m ruff check src tests app scripts`。它仍不触发真实 LLM 或破坏性数据操作。
+- 默认模式验证 Docker 引擎可用、PostgreSQL 可连接、`raw`、`staging`、`warehouse`、`marts` schema 存在、关键分析集市存在、四个运行时产物非空（三个 JSON 可解析、joblib 不执行加载），并检查 `.env` 同时未追踪且仍被 Git 忽略。
+- `--full` 在默认检查通过后，只对 `tests/agent`、`tests/analytics`、`tests/ingestion`、`tests/integration`、`tests/ml`、`tests/validation`、`tests/visualization` 执行 pytest，再执行 `py -3.13 -m ruff check src tests app scripts`。它明确排除 `tests/sql` 及 bootstrap/load/build 入口，保留 600 秒有限超时，不触发真实 LLM 或破坏性数据操作。
 - `--require-source-data` 额外要求 `data/raw/` 中九份 CSV 均存在，面向准备从零重建的环境。
 
-失败信息必须说明失败层级和下一步命令。例如 Docker 不可用时提示启动 Docker Desktop；数据库不可用时提示 `docker compose up -d`；缺失 marts 时提示 `py -3.13 scripts/build_marts.py`；缺失原始 CSV 时指向 `data/README.md`；缺失模型或评测产物时提示对应训练或 fake 评测命令。脚本不泄露数据库密码、LLM Key 或完整连接串。
+失败信息必须说明失败层级和下一步命令。缺 schema 先提示 `bootstrap_db.py`；raw/source 层再指向 `data/README.md` 与 `load_raw.py --data-dir data/raw`；staging/warehouse 层提示 `build_warehouse.py`；只有 schema 均存在而 marts 表缺失时才提示 `build_marts.py`。缺失模型或评测产物提示对应训练或 fake 评测命令。脚本不泄露数据库密码、LLM Key 或完整连接串。
+
+四个产物采用 `generated-after-clone` 策略。仓库跟踪 `artifacts/manifest.json`，逐项声明路径、精确生成命令和前置条件；端到端源码验收验证 manifest，不要求干净 checkout 已存在被忽略的运行时输出。运行时 verifier 仍要求实际产物可用。
 
 ## 文档交付
 
@@ -32,18 +34,19 @@ README 使用中英双语段落，覆盖项目价值、已验证的业务发现�
 
 `docs/data-dictionary.md` 记录 raw、staging、warehouse 与 marts 中交付相关表的粒度、主键、来源及关键字段；`docs/metric-dictionary.md` 以现有指标注册与集市 SQL 为依据定义 GMV、商品金额、订单数、客户数、延迟率、评分和 90 天复购率，并写明过滤条件和分母。
 
+90 天复购必须区分两种真实口径：`customer_360` 及商品/履约分析使用首购 `purchased_at` 起算、观察至 delivered 数据终点 `MAX(purchased_at)` 的 purchase-anchored 标签；`ml_customer_features` 则以首笔已送达订单的送达时间为 `prediction_time`，再检查后续 delivered 订单的 `purchased_at` 是否落入 90 天的 delivery-anchored 标签。任何文档都不得把其中一种写成通用定义。
+
 `docs/architecture.md` 使用 Mermaid 描述 CSV、分层数仓、分析集市、Dashboard、机器学习和 Agent 的单向数据流，解释金额预聚合、时间安全标签、只读 SQL 与审计轨迹。`docs/interview-guide.md` 提供中英文 3 分钟和 10 分钟项目讲述，以及至少十个技术追问与如实回答。`docs/retrospectives/final.md` 记录关键业务发现、最危险的数据错误、模型时间切分、Agent 安全边界、真实模型稳定性限制和下一轮改进建议。
 
 ## 测试与验收
 
-新增端到端测试只检查项目交付契约：质量报告、模型文件、模型指标、Agent fake 评测文件、验证脚本和文档入口存在；它不访问 Docker、网络或真实 LLM。验证脚本自身的单元测试通过注入健康检查与命令执行器，覆盖成功、Docker 不可用、数据库不可用、缺失集市、缺失源文件、缺失产物及 `--full` 命令失败等情况。
+新增端到端测试只检查版本化 artifact manifest、验证脚本和文档入口；它不要求干净 checkout 已存在生成物，也不访问 Docker、网络或真实 LLM。验证脚本自身的单元测试通过注入健康检查与命令执行器，覆盖成功、分层恢复、缺失源文件、空/损坏产物、`.env` 双重保护及安全 `--full` 命令等情况。
 
 验收命令为：
 
 ```powershell
 py -3.13 scripts/verify_project.py
 py -3.13 scripts/verify_project.py --full
-py -3.13 -m pytest -v
 py -3.13 -m ruff check src tests app scripts
 ```
 

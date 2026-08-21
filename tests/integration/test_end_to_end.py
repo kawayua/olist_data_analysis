@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from scripts.verify_project import REQUIRED_ARTIFACTS
@@ -12,14 +13,34 @@ def test_delivery_entrypoints_expose_portable_postgres_volume() -> None:
     ).read_text(encoding="utf-8")
 
 
-def test_artifact_only_delivery_contract_declares_required_paths() -> None:
+def test_generated_after_clone_artifact_manifest_declares_reproducible_policy() -> None:
     assert Path("scripts/verify_project.py").is_file()
-    assert REQUIRED_ARTIFACTS == (
-        "artifacts/quality/latest.json",
-        "artifacts/models/repurchase_pipeline.joblib",
-        "artifacts/models/metrics.json",
-        "artifacts/agent/evaluation.json",
-    )
+    manifest = json.loads(Path("artifacts/manifest.json").read_text(encoding="utf-8"))
+    assert manifest["policy"] == "generated-after-clone"
+    entries = {entry["path"]: entry for entry in manifest["artifacts"]}
+    assert tuple(entries) == REQUIRED_ARTIFACTS
+    assert entries == {
+        "artifacts/quality/latest.json": {
+            "path": "artifacts/quality/latest.json",
+            "generation_command": "py -3.13 scripts/run_quality_checks.py",
+            "prerequisite": "Populated PostgreSQL warehouse and marts",
+        },
+        "artifacts/models/repurchase_pipeline.joblib": {
+            "path": "artifacts/models/repurchase_pipeline.joblib",
+            "generation_command": "py -3.13 scripts/train_model.py",
+            "prerequisite": "Populated marts.ml_customer_features",
+        },
+        "artifacts/models/metrics.json": {
+            "path": "artifacts/models/metrics.json",
+            "generation_command": "py -3.13 scripts/train_model.py",
+            "prerequisite": "Populated marts.ml_customer_features",
+        },
+        "artifacts/agent/evaluation.json": {
+            "path": "artifacts/agent/evaluation.json",
+            "generation_command": "py -3.13 scripts/evaluate_agent.py --mode fake",
+            "prerequisite": "Installed Python dependencies and configs/agent_questions.yml",
+        },
+    }
 
 
 def test_portfolio_documents_cover_local_reproduction_and_evidence() -> None:
@@ -45,16 +66,17 @@ def test_portfolio_documents_cover_local_reproduction_and_evidence() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
     assert "py -3.13 scripts/load_raw.py --data-dir data/raw" in readme
 
-    for document in (
-        "README.md",
-        "docs/architecture.md",
-        "docs/metric-dictionary.md",
-        "docs/interview-guide.md",
-        "docs/retrospectives/final.md",
-    ):
-        content = Path(document).read_text(encoding="utf-8")
-        assert "后续已送达订单的 `purchased_at`" in content
-        assert "later delivered order's `purchased_at`" in content
+    readme = Path("README.md").read_text(encoding="utf-8")
+    assert "POSTGRES_VOLUME_NAME=data_analysis_postgres_data" in readme
+    assert "py -3.13 scripts/verify_project.py --require-source-data" in readme
+    assert "generated-after-clone" in readme
+
+    metric_dictionary = Path("docs/metric-dictionary.md").read_text(encoding="utf-8")
+    assert "分析集市 / analysis marts" in metric_dictionary
+    assert "首购 `purchased_at` / first-purchase `purchased_at`" in metric_dictionary
+    assert "数据终点 `MAX(purchased_at)` / data-end `MAX(purchased_at)`" in metric_dictionary
+    assert "ML 标签 / ML label" in metric_dictionary
+    assert "首笔已送达订单的送达时间 / delivery time of the first delivered order" in metric_dictionary
 
     for document in (
         "README.md",
@@ -68,6 +90,26 @@ def test_portfolio_documents_cover_local_reproduction_and_evidence() -> None:
         assert "artifacts/quality/latest.json" in content
 
 
+def test_data_dictionary_matches_mart_grain_key_and_source_contracts() -> None:
+    content = Path("docs/data-dictionary.md").read_text(encoding="utf-8")
+
+    assert (
+        "`customer_segment_strategy` | 每客户分群一行；`customer_segment` | "
+        "`customer_360` 的分群汇总 + 五条策略规则"
+    ) in content
+    assert (
+        "`repurchase_horizons` | 每个天数窗口一行；`horizon_days` | delivered orders"
+    ) in content
+    assert (
+        "`repurchase_behavior` | 首购品类 × 天数窗口；"
+        "(`first_purchase_category`, `horizon_days`)"
+    ) in content
+    assert (
+        "`monthly_growth` | 每自然月；`month_start` | delivered "
+        "`warehouse.fact_orders` + `warehouse.fact_reviews`"
+    ) in content
+
+
 def test_day20_final_retrospective_records_acceptance_results() -> None:
     content = Path("docs/retrospectives/final.md").read_text(encoding="utf-8")
 
@@ -76,16 +118,16 @@ def test_day20_final_retrospective_records_acceptance_results() -> None:
     assert "不调用真实" in content
 
 
-def test_day20_retrospective_states_accurate_acceptance_sequence() -> None:
+def test_day20_retrospective_states_non_destructive_acceptance_boundary() -> None:
     content = Path("docs/retrospectives/final.md").read_text(encoding="utf-8")
 
-    assert "Docker availability check" in content
-    assert "Docker Compose/Docker startup" in content
-    assert "original two-phrase assertion did not go RED" in content
+    assert "tests/sql" in content
+    assert "非 SQL 测试目录" in content
+    assert "non-SQL test directories" in content
 
 
-def test_day20_retrospective_records_concurrency_root_cause() -> None:
+def test_day20_retrospective_invalidates_the_old_broad_pytest_evidence() -> None:
     content = Path("docs/retrospectives/final.md").read_text(encoding="utf-8")
 
-    assert "test-process concurrency" in content
-    assert "sequential rerun" in content
+    assert "旧结果不能证明非破坏性交付" in content
+    assert "historical results do not prove non-destructive delivery" in content

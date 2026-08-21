@@ -60,11 +60,11 @@
 
 | 集市 / Mart | 粒度与键 / Grain and key | 来源 / Source | 关键字段 / Key fields |
 | --- | --- | --- | --- |
-| `monthly_growth` | 每自然月；`month_start` | delivered `fact_orders` + reviews | 商品/支付金额、订单/客户、新老客、AOV、环比、完整月标记 |
+| `monthly_growth` | 每自然月；`month_start` | delivered `warehouse.fact_orders` + `warehouse.fact_reviews` | 商品/支付金额、订单/客户、新老客、AOV、环比、订单评价均值、完整月标记 |
 | `cohort_retention` | cohort 月 × 活动月；(`cohort_month`, `activity_month`) | delivered orders | cohort size、retained customers、rate、完整观察月 |
-| `repurchase_horizons` | 首购品类 × 天数窗口；复合键 | delivered orders/items | 30/60/90 天资格客户、复购客户、比例 |
+| `repurchase_horizons` | 每个天数窗口一行；`horizon_days` | delivered orders | 30/60/90 天资格客户、复购客户、比例与 Wilson 区间 |
 | `customer_360` | 每客户快照；`customer_key` | delivered orders/items/reviews | RFM、金额、配送、评分、segment、90 天资格与标签 |
-| `customer_segment_strategy` | 每客户；`customer_key` | `customer_360` | segment、建议策略、客户/金额贡献 |
+| `customer_segment_strategy` | 每客户分群一行；`customer_segment` | `customer_360` 的分群汇总 + 五条策略规则 | 分群定义、建议策略、客户/金额贡献及频次限制 |
 | `product_performance` | 每商品品类；`product_category` | orders/items/products/reviews/customer_360 | 订单/客户、商品/运费金额、延迟、评分、90 天复购 |
 | `delivery_experience` | 每履约状态；`delivery_status` | delivered orders/reviews/customer_360 | late/on_time、配送天数、评分、90 天复购 |
 | `delivery_order_analysis` | 每已送达订单；`order_id` | orders/reviews/customer_360 | 履约、评分、首购资格和复购标签 |
@@ -72,7 +72,7 @@
 | `state_performance` | 每客户州；`customer_state` | delivered orders + raw customers + reviews | 订单/客户、金额、延迟、配送、评分、90 天复购 |
 | `state_monthly_performance` | 州 × 月；复合键 | state performance 来源 | 月度订单、客户、金额、履约与评分 |
 | `customer_value_analysis` | 客户分群；`customer_segment` | customer_360 | 客户数、金额、贡献、策略字段 |
-| `repurchase_behavior` | 首购品类 × 窗口；复合键 | delivered orders/items | 资格、复购、30/60/90 天比例 |
+| `repurchase_behavior` | 首购品类 × 天数窗口；(`first_purchase_category`, `horizon_days`) | delivered orders/items/products | 资格、复购、30/60/90 天比例 |
 | `repurchase_intervals` | 复购间隔桶；`interval_bucket` | delivered orders | 0–30 至 181+ 天客户数 |
 | `ml_customer_features` | 每客户；`customer_key` | 首笔已送达订单及其商品 | prediction time、六个首单特征、观察终点、资格、90 天标签 |
 

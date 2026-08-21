@@ -14,7 +14,7 @@
 
 - Docker runs PostgreSQL only; Streamlit starts with `py -3.13 -m streamlit run app/Home.py --server.port 8501`.
 - Default verification must not download CSVs, mutate data, build marts, train models, or invoke LLMs.
-- `--full` runs exactly `py -3.13 -m pytest -v` and `py -3.13 -m ruff check src tests app scripts` after health passes.
+- `--full` runs pytest only against the explicit non-database directories `tests/agent tests/analytics tests/ingestion tests/integration tests/ml tests/validation tests/visualization`, then runs `py -3.13 -m ruff check src tests app scripts`; it never includes `tests/sql` or a build/bootstrap/load entrypoint.
 - Raw CSVs are never committed; require all nine only with `--require-source-data`.
 - Never print credentials, API keys or connection URLs. `.env` stays ignored.
 - `POSTGRES_VOLUME_NAME` defaults to `data_analysis_postgres_data`; a local override can attach an existing volume.
@@ -95,7 +95,8 @@ def test_database_failure_has_safe_compose_recovery(tmp_path):
 def test_full_mode_runs_exact_commands_after_health(tmp_path):
     deps = passing_dependencies(project_root=tmp_path)
     assert verify_project(deps, require_source_data=False, full=True).ok
-    assert deps.commands == [("py", "-3.13", "-m", "pytest", "-v"), ("py", "-3.13", "-m", "ruff", "check", "src", "tests", "app", "scripts")]
+    assert deps.commands[0] == ("py", "-3.13", "-m", "pytest", "-v", "tests/agent", "tests/analytics", "tests/ingestion", "tests/integration", "tests/ml", "tests/validation", "tests/visualization")
+    assert "tests/sql" not in deps.commands[0]
 ```
 
 Add sibling tests for Docker unavailable, missing schema/mart/artifact, tracked `.env`, one absent raw CSV under `--require-source-data`, and a failed full command. Each must assert its exact safe recovery guidance.
@@ -118,15 +119,16 @@ def verify_project(dependencies: VerificationDependencies, *, require_source_dat
     """Observe readiness without changing data, services, model state, or LLM state."""
 ```
 
-Production adapters inspect Docker, use a short SQLAlchemy schema/table query, check readable paths, and use `git ls-files --error-unmatch .env`. Store nine CSV names and required marts/artifacts in constants. Do not call bootstrap/loading/build/train/evaluate/Streamlit/LLM. Run the exact full commands only after health passes, and return non-zero from CLI for any failure.
+Production adapters inspect Docker, use a short SQLAlchemy schema/table query, reject empty/corrupt artifacts, and require both `git ls-files --error-unmatch .env` to fail and `git check-ignore --quiet .env` to pass. Store nine CSV names and required marts/artifacts in constants. Do not call bootstrap/loading/build/train/evaluate/Streamlit/LLM. Run the explicit safe full commands only after health passes, and return non-zero from CLI for any failure.
 
 - [ ] **Step 4: Add the no-network delivery contract and verify GREEN**
 
 ```python
 def test_final_delivery_has_non_networked_verification_contract() -> None:
     assert Path("scripts/verify_project.py").is_file()
-    for artifact in ("artifacts/quality/latest.json", "artifacts/models/repurchase_pipeline.joblib", "artifacts/models/metrics.json", "artifacts/agent/evaluation.json"):
-        assert Path(artifact).is_file()
+    manifest = json.loads(Path("artifacts/manifest.json").read_text(encoding="utf-8"))
+    assert manifest["policy"] == "generated-after-clone"
+    assert {entry["path"] for entry in manifest["artifacts"]} == set(REQUIRED_ARTIFACTS)
 ```
 
 Run: `py -3.13 -m pytest tests/integration/test_verify_project.py tests/integration/test_end_to_end.py -v`
@@ -174,7 +176,7 @@ Expected: FAIL because the entrypoints are absent.
 
 - [ ] **Step 3: Write documentation from governed sources**
 
-README covers paired Chinese-English project value, verified findings, nine-CSV boundary, Docker/Python quick start, rebuild route, structure, dashboard, temporal ML, Agent safety/fake evaluation and limits. Data dictionary records grain/key/source/fields for raw, staging, warehouse and marts. Metric dictionary defines GMV, item revenue, order/customer counts, delay rate, rating and 90-day repurchase with formula, filters, denominator and caveat. Architecture contains a Mermaid CSV-to-marts-to-Dashboard/ML/Agent diagram and explains monetary preaggregation, observation windows and AST-guarded read-only/audited SQL. Interview guide provides paired 3-/10-minute narration plus ten candid technical Q&As. Retrospective records findings, double-counting risk, leakage control, model/business caveats, Agent safety, observed provider instability and next improvements.
+README covers paired Chinese-English project value, verified findings, nine-CSV boundary, Docker/Python quick start, portable volume override, strict source-data mode, generated-after-clone artifacts, structure, dashboard, temporal ML, Agent safety/fake evaluation and limits. Documents distinguish purchase-anchored analysis-mart labels (first-purchase `purchased_at`, completeness through data-end `MAX(purchased_at)`) from the delivery-anchored ML label (first-delivery prediction time and later delivered-order `purchased_at`). Data dictionary records grain/key/source/fields for raw, staging, warehouse and marts. Metric dictionary defines GMV, item revenue, order/customer counts, delay rate, rating and both 90-day repurchase contexts. Architecture contains a Mermaid CSV-to-marts-to-Dashboard/ML/Agent diagram and explains monetary preaggregation, observation windows and AST-guarded read-only/audited SQL. Interview guide provides paired 3-/10-minute narration plus ten candid technical Q&As. Retrospective records findings, double-counting risk, leakage control, model/business caveats, Agent safety, observed provider instability and next improvements.
 
 - [ ] **Step 4: Verify GREEN and rendered content**
 
@@ -215,7 +217,6 @@ Expected: FAIL before acceptance is recorded.
 ```powershell
 py -3.13 scripts/verify_project.py
 py -3.13 scripts/verify_project.py --full
-py -3.13 -m pytest -v
 py -3.13 -m ruff check src tests app scripts
 ```
 
@@ -235,6 +236,6 @@ Commit: `git add docs/retrospectives/final.md docs/learning/week-2.md tests/inte
 
 - [ ] Default verification does not mutate data/model/LLM state.
 - [ ] Full verification makes no live LLM request.
-- [ ] Full pytest and Ruff pass.
+- [ ] Explicit non-database pytest directories and Ruff pass; `tests/sql` remains developer-only and isolated from readiness verification.
 - [ ] `.env` is ignored and untracked.
 - [ ] Rendered README covers startup, volume override, raw data recovery and live-model limits.

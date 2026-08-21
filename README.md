@@ -12,6 +12,8 @@
 
 **English.** Among delivered orders with ratings, the on-time group has 88,171 orders and the late group has 7,661; their median ratings are 5 and 2, with a rank-biserial correlation of -0.554 from the Mann–Whitney test. The 90-day repurchase rate is 2.027% for on-time first-purchase customers (1,394 of 68,778) and 1.816% for late customers (120 of 6,609); the absolute difference is -0.211 percentage points and Fisher's exact test is p=0.251, so this is not a causal claim that lateness causes churn. The highest item-revenue category, `health_beauty`, has 1,233,131.72 in item revenue and a 1.951% 90-day repurchase rate; `bed_bath_table` has 1,023,434.76 and 3.536%. These are historical descriptions under defined metrics, not current Olist results or promised action value.
 
+**口径说明 / Definition note.** 上述客户、商品和履约分析集市以首购 `purchased_at` 为 90 天窗口起点，并以数据终点 `MAX(purchased_at)` 判断观察期完整；这与后文 ML 的首单送达时间锚点不同。 / The customer, product, and delivery analysis marts above anchor the 90-day window on first-purchase `purchased_at` and assess completeness through data-end `MAX(purchased_at)`; this differs from the ML delivery-time anchor described below.
+
 ## 数据边界 / Data boundary
 
 **中文。** 原始输入严格限于 Olist 发布的九个 CSV：客户、订单、订单商品、支付、评价、商品、卖家、地理位置和品类翻译。文件名、主键和列由 `src/ingestion/contracts.py` 校验；原始 CSV 不进入 Git。下载、放置和许可边界见 [data/README.md](data/README.md)。交易分析和行为指标默认仅使用 `delivered` 订单；客户身份以 `customer_unique_id` 统一，而不是订单地址层面的 `customer_id`。
@@ -27,6 +29,8 @@ docker compose up -d
 py -3.13 -m streamlit run app/Home.py --server.port 8501
 ```
 
+默认 PostgreSQL 卷名是 `data_analysis_postgres_data`。若要连接已有本地卷，只在未提交的 `.env` 中写入 `POSTGRES_VOLUME_NAME=已有卷名`；新环境可显式使用 `POSTGRES_VOLUME_NAME=data_analysis_postgres_data`，任何机器专用覆盖值都不得提交。 / The default PostgreSQL volume is `data_analysis_postgres_data`. To attach an existing local volume, set `POSTGRES_VOLUME_NAME=existing_volume_name` only in the untracked `.env`; a new environment may explicitly use `POSTGRES_VOLUME_NAME=data_analysis_postgres_data`. Never commit a machine-specific override.
+
 若要从空数据库恢复，先按 [data/README.md](data/README.md) 放置九个 CSV，然后依次运行：
 
 ```powershell
@@ -39,7 +43,7 @@ py -3.13 scripts/train_model.py
 py -3.13 scripts/evaluate_agent.py --mode fake
 ```
 
-质量报告入口 `py -3.13 scripts/run_quality_checks.py` 读取现有数据库，并且只写入 `artifacts/quality/latest.json`；它不重建数据层。日常验收不需要下载 CSV、重建表、训练模型或调用 LLM：运行 `py -3.13 scripts/verify_project.py`。完整本地检查使用 `py -3.13 scripts/verify_project.py --full`。若数据库未就绪，先确认 Docker 可用并重试 `docker compose up -d`；恢复流程会改动本地派生数据，应与只读验收区分。
+质量报告入口 `py -3.13 scripts/run_quality_checks.py` 读取现有数据库，并且只写入 `artifacts/quality/latest.json`；它不重建数据层。日常验收不需要下载 CSV、重建表、训练模型或调用 LLM：运行 `py -3.13 scripts/verify_project.py`。`py -3.13 scripts/verify_project.py --full` 只追加明确列出的非 SQL 测试目录和 Ruff，排除会重建数据库的 `tests/sql`。准备从九份 CSV 重建时，可先运行 `py -3.13 scripts/verify_project.py --require-source-data` 检查源文件清单。若数据库未就绪，先确认 Docker 可用并重试 `docker compose up -d`；恢复流程会改动本地派生数据，应与只读验收区分。
 
 **English.** Python 3.13, Docker Compose, and configured local dependencies are required. Copy `.env.example` to an untracked `.env`, fill in local database and optional LLM settings as needed, and never commit `.env`, secrets, or a local volume override. Start the database and dashboard with:
 
@@ -60,7 +64,9 @@ py -3.13 scripts/train_model.py
 py -3.13 scripts/evaluate_agent.py --mode fake
 ```
 
-The quality-report entrypoint, `py -3.13 scripts/run_quality_checks.py`, reads the existing database and writes only `artifacts/quality/latest.json`; it does not rebuild a data layer. Routine acceptance does not download CSVs, rebuild tables, train a model, or call an LLM: run `py -3.13 scripts/verify_project.py`. Use `py -3.13 scripts/verify_project.py --full` for the complete local check. If the database is not ready, confirm Docker is available and retry `docker compose up -d`; the restore route mutates local derived data and is deliberately separate from read-only acceptance.
+The quality-report entrypoint, `py -3.13 scripts/run_quality_checks.py`, reads the existing database and writes only `artifacts/quality/latest.json`; it does not rebuild a data layer. Routine acceptance does not download CSVs, rebuild tables, train a model, or call an LLM: run `py -3.13 scripts/verify_project.py`. `py -3.13 scripts/verify_project.py --full` adds only explicitly listed non-SQL test directories and Ruff, excluding the database-rebuilding `tests/sql`. Before rebuilding from the nine CSVs, use `py -3.13 scripts/verify_project.py --require-source-data` to check the source-file inventory. If the database is not ready, confirm Docker is available and retry `docker compose up -d`; the restore route mutates local derived data and is deliberately separate from read-only acceptance.
+
+生成产物采用 `generated-after-clone` 策略：Git 只跟踪 [artifacts/manifest.json](artifacts/manifest.json)，其中逐项记录四个必需产物、精确生成命令和前置条件；克隆后按上面的恢复顺序生成。运行时验证器仍要求四个实际产物非空，且三个 JSON 可解析。 / Generated artifacts follow a `generated-after-clone` policy: Git tracks only [artifacts/manifest.json](artifacts/manifest.json), which records all four required outputs, their exact generation commands, and prerequisites. Generate them after cloning in the recovery order above. The runtime verifier still requires all four outputs to be non-empty and all three JSON files to parse.
 
 ## 结构与仪表盘 / Structure and dashboard
 
@@ -70,7 +76,7 @@ The quality-report entrypoint, `py -3.13 scripts/run_quality_checks.py`, reads t
 | `sql/` | `raw → staging → warehouse → marts` 的可重建 SQL。 | Rebuildable SQL for `raw → staging → warehouse → marts`. |
 | `src/` | 导入、指标、ML、Agent、安全与质量代码。 | Ingestion, metrics, ML, Agent, safety, and quality code. |
 | `app/` | Streamlit 首页、共享组件与页面。 | Streamlit home page, shared components, and pages. |
-| `artifacts/` | 已保存的质量、模型和 Agent 假评估产物。 | Saved quality, model, and Agent fake-evaluation artifacts. |
+| `artifacts/` | 版本化生成清单；质量、模型和 Agent fake 评测在克隆后生成并保持忽略。 | Versioned generation manifest; quality, model, and fake-Agent outputs are generated after clone and remain ignored. |
 | `docs/` | 口径、架构、访谈材料和回顾。 | Definitions, architecture, interview material, and retrospective. |
 
 **中文。** 仪表盘页面为经营总览、增长诊断、留存复购、客户价值、商品与履约、营销 ROI 模拟器和 AI 分析助手。展示层中文化；内部 DataFrame、SQL 和模型字段保留英文以保持实现一致性。默认提示并排除不完整月份，州指客户收货地址州。

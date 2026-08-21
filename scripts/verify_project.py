@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
@@ -43,7 +44,20 @@ REQUIRED_RAW_FILES = (
     "product_category_name_translation.csv",
 )
 FULL_COMMANDS = (
-    ("py", "-3.13", "-m", "pytest", "-v"),
+    (
+        "py",
+        "-3.13",
+        "-m",
+        "pytest",
+        "-v",
+        "tests/agent",
+        "tests/analytics",
+        "tests/ingestion",
+        "tests/integration",
+        "tests/ml",
+        "tests/validation",
+        "tests/visualization",
+    ),
     ("py", "-3.13", "-m", "ruff", "check", "src", "tests", "app", "scripts"),
 )
 
@@ -68,6 +82,7 @@ class VerificationDependencies:
     available_schemas: Callable[[], set[str]]
     available_marts: Callable[[], set[str]]
     is_env_tracked: Callable[[], bool]
+    is_env_ignored: Callable[[], bool]
     run_command: Callable[[Sequence[str]], bool]
 
 
@@ -129,6 +144,9 @@ def default_dependencies(root: Path = PROJECT_ROOT) -> VerificationDependencies:
         is_env_tracked=lambda: _run_quietly(
             ("git", "ls-files", "--error-unmatch", ".env"), cwd=root, timeout=15
         ),
+        is_env_ignored=lambda: _run_quietly(
+            ("git", "check-ignore", "--quiet", ".env"), cwd=root, timeout=15
+        ),
         run_command=lambda command: _run_quietly(command, cwd=root, timeout=600),
     )
 
@@ -139,6 +157,37 @@ def _artifact_guidance(relative_path: str) -> str:
     if relative_path == "artifacts/agent/evaluation.json":
         return "Run py -3.13 scripts/evaluate_agent.py --mode fake to recreate it."
     return "Run py -3.13 scripts/run_quality_checks.py to recreate the quality artifact."
+
+
+def _schema_recovery_guidance(missing_schemas: Sequence[str]) -> str:
+    steps = ["Run py -3.13 scripts/bootstrap_db.py."]
+    if "raw" in missing_schemas:
+        steps.append(
+            "Then see data/README.md and run "
+            "py -3.13 scripts/load_raw.py --data-dir data/raw."
+        )
+    if {"staging", "warehouse"}.intersection(missing_schemas):
+        steps.append("Then run py -3.13 scripts/build_warehouse.py.")
+    if "marts" in missing_schemas:
+        steps.append("Then run py -3.13 scripts/build_marts.py.")
+    return " ".join(steps)
+
+
+def _artifact_is_readable(artifact: Path) -> bool:
+    """Validate generated artifacts without executing serialized model code."""
+
+    try:
+        if not artifact.is_file() or artifact.stat().st_size == 0:
+            return False
+        if artifact.suffix == ".json":
+            with artifact.open(encoding="utf-8") as file:
+                json.load(file)
+        else:
+            with artifact.open("rb") as file:
+                return bool(file.read(1))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    return True
 
 
 def verify_project(
@@ -160,27 +209,26 @@ def verify_project(
         if missing_schemas:
             messages.append(
                 "Missing database schemas: "
-                f"{', '.join(missing_schemas)}. Run py -3.13 scripts/build_marts.py."
+                f"{', '.join(missing_schemas)}. "
+                f"{_schema_recovery_guidance(missing_schemas)}"
             )
-        missing_marts = sorted(set(REQUIRED_MARTS) - dependencies.available_marts())
-        if missing_marts:
-            messages.append(
-                "Missing marts: "
-                f"{', '.join(missing_marts)}. Run py -3.13 scripts/build_marts.py."
-            )
+        else:
+            missing_marts = sorted(set(REQUIRED_MARTS) - dependencies.available_marts())
+            if missing_marts:
+                messages.append(
+                    "Missing marts: "
+                    f"{', '.join(missing_marts)}. Run py -3.13 scripts/build_marts.py."
+                )
 
     for relative_path in REQUIRED_ARTIFACTS:
         artifact = dependencies.root / relative_path
-        try:
-            with artifact.open("rb") as file:
-                readable = artifact.is_file() and file.read(1) is not None
-        except OSError:
-            readable = False
-        if not readable:
+        if not _artifact_is_readable(artifact):
             messages.append(f"Missing or unreadable {relative_path}. {_artifact_guidance(relative_path)}")
 
     if dependencies.is_env_tracked():
         messages.append(".env is tracked by git; remove it from version control before delivery.")
+    if not dependencies.is_env_ignored():
+        messages.append(".env is not ignored by git; add it to .gitignore before delivery.")
 
     if require_source_data:
         missing_raw = [
@@ -191,7 +239,8 @@ def verify_project(
         if missing_raw:
             messages.append(
                 "Missing required source data: "
-                f"{', '.join(missing_raw)}. See data/README.md."
+                f"{', '.join(missing_raw)}. See data/README.md, then run "
+                "py -3.13 scripts/load_raw.py --data-dir data/raw."
             )
 
     if messages:
