@@ -20,3 +20,24 @@ def test_artifact_only_delivery_contract_declares_required_paths() -> None:
         "artifacts/models/metrics.json",
         "artifacts/agent/evaluation.json",
     )
+
+
+def test_portfolio_documents_cover_local_reproduction_and_evidence() -> None:
+    required_content = {
+        "README.md": (
+            "中文",
+            "English",
+            "docker compose up -d",
+            "streamlit run app/Home.py",
+        ),
+        "docs/data-dictionary.md": ("raw", "staging", "warehouse", "marts"),
+        "docs/metric-dictionary.md": ("GMV", "90", "复购"),
+        "docs/architecture.md": ("```mermaid", "只读 SQL"),
+        "docs/interview-guide.md": ("3", "10", "追问"),
+        "docs/retrospectives/final.md": ("真实模型", "限制"),
+    }
+
+    for document, expected_terms in required_content.items():
+        content = Path(document).read_text(encoding="utf-8")
+        for term in expected_terms:
+            assert term in content, f"{document} must document {term!r}"
