@@ -17,3 +17,4 @@ services:
 
 volumes:
   postgres_data:
+    name: ${POSTGRES_VOLUME_NAME:-data_analysis_postgres_data}
