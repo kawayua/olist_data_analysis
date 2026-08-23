@@ -3,6 +3,7 @@
 import pandas as pd
 import streamlit as st
 
+from app.components.kpis import render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
     render_insight,
@@ -48,11 +49,7 @@ else:
             "按客户数加权",
         ),
     ]
-    for column, (label, value, help_text) in zip(
-        st.columns(5), metrics, strict=True
-    ):
-        with column:
-            st.metric(label, value, help=help_text)
+    render_kpis([(label, str(value), help_text) for label, value, help_text in metrics])
     left, right = st.columns(2)
     with left, st.container(border=True):
         st.plotly_chart(
@@ -64,7 +61,7 @@ else:
                 "RFM 分群价值分布",
                 color="customer_segment",
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption("横轴为平均购买次数，纵轴为平均客户商品金额，气泡面积为客户数。")
     with right, st.container(border=True):
@@ -72,9 +69,9 @@ else:
             ranked_bar_chart(
                 frame, "customer_segment", "item_revenue", "客户分群商品金额"
             ),
-            use_container_width=True,
+            width="stretch",
         )
-        st.dataframe(display_dataframe(frame), use_container_width=True, hide_index=True)
+        st.dataframe(display_dataframe(frame), width="stretch", hide_index=True)
     render_insight(
         "解读提示",
         "购买阶段描述已观测订单频次，不把近期未购直接解释为流失；召回优先结合 RFM 的最近购买间隔判断。",

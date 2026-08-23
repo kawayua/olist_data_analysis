@@ -31,6 +31,7 @@ def load_state_performance(filters: DashboardFilters) -> pd.DataFrame:
 
 def main() -> None:
     st.set_page_config(page_title="Olist 增长分析", page_icon="📈", layout="wide")
+    st.switch_page("pages/1_经营总览.py")
     apply_dashboard_theme()
     render_navigation()
     render_page_header(

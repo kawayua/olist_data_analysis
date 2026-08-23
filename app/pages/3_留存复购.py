@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from app.components.filters import DashboardFilters
+from app.components.kpis import render_kpis
 from app.components.layout import (
     apply_dashboard_theme,
     render_insight,
@@ -51,13 +52,16 @@ else:
     rates["repurchase_rate_pct"] = (
         rates.repurchased_customers / rates.eligible_customers * 100
     )
-    for column, row in zip(st.columns(3), rates.itertuples(), strict=True):
-        with column:
-            st.metric(
+    render_kpis(
+        [
+            (
                 f"{int(row.horizon_days)}天复购率",
                 f"{row.repurchase_rate_pct:.3f}%",
-                help="满足对应观察期的首购客户",
+                "满足对应观察期的首购客户",
             )
+            for row in rates.itertuples()
+        ]
+    )
     matrix = cohort.pivot(
         index="cohort_month",
         columns="months_since_cohort",
@@ -66,7 +70,7 @@ else:
     left, right = st.columns(2)
     with left, st.container(border=True):
         st.subheader("Cohort 留存热力图（%）")
-        st.plotly_chart(retention_heatmap(matrix), use_container_width=True)
+        st.plotly_chart(retention_heatmap(matrix), width="stretch")
     with right, st.container(border=True):
         st.subheader("首购品类 90 天复购率")
         ninety_days = behavior.loc[behavior.horizon_days == 90]
@@ -77,7 +81,7 @@ else:
                 "repurchase_rate_pct",
                 "首购品类90天复购率",
             ),
-            use_container_width=True,
+            width="stretch",
         )
     left, right = st.columns(2)
     with left, st.container(border=True):
@@ -86,11 +90,11 @@ else:
             ranked_bar_chart(
                 intervals, "interval_bucket", "customer_count", "二购间隔客户数"
             ),
-            use_container_width=True,
+            width="stretch",
         )
     with right, st.container(border=True):
         st.subheader("首购品类复购明细")
-        st.dataframe(display_dataframe(behavior), use_container_width=True, hide_index=True)
+        st.dataframe(display_dataframe(behavior), width="stretch", hide_index=True)
     render_insight(
         "解读提示",
         "低频电商更适合用 30/60/90 天及月度 Cohort 观察复购，不应照搬 App 的次日留存。",

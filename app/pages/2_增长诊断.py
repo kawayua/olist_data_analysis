@@ -59,17 +59,17 @@ else:
         ("item_revenue_aov", "商品金额客单价趋势"),
     ]:
         with st.container(border=True):
-            st.plotly_chart(line_chart(frame, "month_start", metric, title), use_container_width=True)
+            st.plotly_chart(line_chart(frame, "month_start", metric, title), width="stretch")
     left, right = st.columns(2)
     with left, st.container(border=True):
         st.plotly_chart(
             bubble_scatter_chart(frame.dropna(subset=["item_revenue_mom_pct"]), "item_revenue_mom_pct", "item_revenue", "order_count", "月度增长机会矩阵"),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption("横轴为商品金额环比，纵轴为商品金额，气泡面积为订单数。")
     with right, st.container(border=True):
-        st.plotly_chart(ranked_bar_chart(frame, "month_start", "new_customer_item_revenue", "新客商品金额"), use_container_width=True)
-        st.plotly_chart(ranked_bar_chart(frame, "month_start", "returning_customer_item_revenue", "老客商品金额"), use_container_width=True)
+        st.plotly_chart(ranked_bar_chart(frame, "month_start", "new_customer_item_revenue", "新客商品金额"), width="stretch")
+        st.plotly_chart(ranked_bar_chart(frame, "month_start", "returning_customer_item_revenue", "老客商品金额"), width="stretch")
     with st.container(border=True):
         render_insight(
             "增长解读",

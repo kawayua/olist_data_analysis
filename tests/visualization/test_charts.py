@@ -157,3 +157,27 @@ def test_bubble_chart_translates_product_category_legend_values():
     )
 
     assert figure.data[0].name == "玩具"
+
+
+def test_shared_chart_palette_keeps_legends_and_heatmap_low_values_visible():
+    bubble = bubble_scatter_chart(
+        pd.DataFrame(
+            {
+                "order_count": [5, 8],
+                "item_revenue": [100.0, 160.0],
+                "average_review_score": [4.0, 4.5],
+                "product_category": ["toys", "health_beauty"],
+            }
+        ),
+        "order_count",
+        "item_revenue",
+        "average_review_score",
+        "品类表现",
+        color="product_category",
+    )
+    heatmap = retention_heatmap(pd.DataFrame([[100.0, 50.0]]))
+
+    assert bubble.data[0].marker.color == "#1E40AF"
+    assert bubble.layout.legend.bgcolor == "rgba(255,255,255,0.94)"
+    assert bubble.layout.legend.bordercolor == "#94A3B8"
+    assert heatmap.layout.coloraxis.colorscale[0][1] == "#93C5FD"

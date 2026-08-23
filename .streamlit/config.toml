@@ -1,2 +1,14 @@
 [client]
 showSidebarNavigation = false
+
+[theme]
+base = "light"
+primaryColor = "#1E40AF"
+backgroundColor = "#F8FAFC"
+secondaryBackgroundColor = "#E9EEF6"
+textColor = "#172B4D"
+borderColor = "#DBEAFE"
+baseRadius = "0.6rem"
+showWidgetBorder = true
+chartCategoricalColors = ["#1E40AF", "#3B82F6", "#D97706", "#0F766E", "#7C3AED", "#B91C1C", "#475569"]
+chartSequentialColors = ["#93C5FD", "#7DB8F7", "#60A5FA", "#4C97EE", "#3B82F6", "#2563EB", "#1D4ED8", "#1E40AF", "#1E3A8A", "#172554"]

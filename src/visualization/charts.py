@@ -22,6 +22,26 @@ CURRENCY_COLUMNS = {
     "repeat_customer_item_revenue",
 }
 
+CHART_DISCRETE_COLORS = [
+    "#1E40AF",
+    "#0F766E",
+    "#B45309",
+    "#7C3AED",
+    "#BE123C",
+    "#0369A1",
+    "#4D7C0F",
+]
+
+CHART_SEQUENTIAL_COLORS = [
+    "#93C5FD",
+    "#7DB8F7",
+    "#60A5FA",
+    "#3B82F6",
+    "#2563EB",
+    "#1D4ED8",
+    "#1E3A8A",
+]
+
 
 def localized_chart_frame(
     frame: pd.DataFrame, *categorical_columns: str | None
@@ -74,7 +94,16 @@ def apply_chart_layout(figure: Figure, x: str, y: str) -> Figure:
         paper_bgcolor="white",
         plot_bgcolor="white",
         font={"color": "#13233D"},
-        legend={"orientation": "h", "x": 0, "xanchor": "left", "y": 1.02},
+        legend={
+            "orientation": "h",
+            "x": 0,
+            "xanchor": "left",
+            "y": 1.02,
+            "bgcolor": "rgba(255,255,255,0.94)",
+            "bordercolor": "#94A3B8",
+            "borderwidth": 1,
+            "font": {"color": "#172B4D"},
+        },
     )
     figure.update_xaxes(title=x_label, gridcolor="#E5E7EB")
     figure.update_yaxes(title=y_label, gridcolor="#E5E7EB")
@@ -95,6 +124,7 @@ def line_chart(frame: pd.DataFrame, x: str, y: str, title: str) -> Figure:
         y=y,
         title=localized_chart_title(title),
         labels={name: display_label(name) for name in frame.columns},
+        color_discrete_sequence=CHART_DISCRETE_COLORS,
     )
     return apply_chart_layout(figure, x, y)
 
@@ -113,6 +143,7 @@ def ranked_bar_chart(
         text=y,
         labels={name: display_label(name) for name in ordered.columns},
         title=localized_chart_title(title),
+        color_discrete_sequence=CHART_DISCRETE_COLORS,
     )
     return apply_chart_layout(figure, x, y)
 
@@ -126,7 +157,7 @@ def retention_heatmap(matrix: pd.DataFrame) -> Figure:
             "y": "首购月份（同期群）",
             "color": "留存率（%）",
         },
-        color_continuous_scale="Blues",
+        color_continuous_scale=CHART_SEQUENTIAL_COLORS,
         aspect="auto",
     )
     figure.update_layout(
@@ -158,5 +189,6 @@ def bubble_scatter_chart(
         color=color,
         title=localized_chart_title(title),
         labels={name: display_label(name) for name in chart_frame.columns},
+        color_discrete_sequence=CHART_DISCRETE_COLORS,
     )
     return apply_chart_layout(figure, x, y)

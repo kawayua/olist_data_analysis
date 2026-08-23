@@ -14,6 +14,10 @@ from app.components.navigation import render_navigation
 from app.components.presentation import summarize_state_performance
 from app.Home import get_repository
 from src.visualization.charts import line_chart, ranked_bar_chart
+from src.visualization.maps import (
+    brazil_state_polygon_map,
+    load_brazil_states_geojson,
+)
 
 
 @st.cache_data
@@ -29,6 +33,12 @@ def load_monthly_growth() -> pd.DataFrame:
 @st.cache_data
 def load_product_performance() -> pd.DataFrame:
     return get_repository().product_performance(DashboardFilters().to_repository_filters())
+
+
+@st.cache_data(ttl=86_400)
+def load_brazil_state_boundaries() -> dict:
+    """Cache the official state boundaries so page refreshes stay responsive."""
+    return load_brazil_states_geojson()
 
 
 st.set_page_config(page_title="经营总览", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
@@ -82,24 +92,56 @@ else:
             ),
         ]
     )
-    left, right = st.columns((2, 1))
-    with left, st.container(border=True):
-        st.subheader("客户所在州商品金额")
-        st.plotly_chart(
-            ranked_bar_chart(
-                frame,
-                x="customer_state",
-                y="item_revenue",
-                title="客户所在州商品金额",
-            ),
-            use_container_width=True,
-        )
-        st.caption("口径：州指客户收货地址州；指标使用全局完整月份数据。")
-    with right, st.container(border=True):
+    st.subheader("州级经营表现")
+    st.caption("桌面端悬停州块可查看详细指标；触屏设备可使用图表工具栏缩放查看。")
+    try:
+        brazil_boundaries = load_brazil_state_boundaries()
+    except (OSError, ValueError, KeyError) as error:
+        brazil_boundaries = None
+        st.warning(f"暂时无法加载巴西州界地图：{error}")
+
+    if brazil_boundaries is not None:
+        payment_map, product_map = st.columns(2)
+        with payment_map, st.container(border=True):
+            st.plotly_chart(
+                brazil_state_polygon_map(
+                    frame,
+                    geojson=brazil_boundaries,
+                    color_metric="payment_value",
+                    hover_metrics=("payment_value", "customer_count"),
+                    title="客户支付金额与人数分布",
+                ),
+                width="stretch",
+            )
+            st.caption("悬停州块查看支付金额与去重客户数。")
+        with product_map, st.container(border=True):
+            st.plotly_chart(
+                brazil_state_polygon_map(
+                    frame,
+                    geojson=brazil_boundaries,
+                    color_metric="item_revenue",
+                    hover_metrics=(
+                        "item_revenue",
+                        "customer_count",
+                        "average_review_score",
+                    ),
+                    title="商品销售额、人数与平均评分",
+                ),
+                width="stretch",
+            )
+            st.caption("悬停州块查看商品销售额、去重客户数与平均评分。")
+    else:
+        with st.container(border=True):
+            st.plotly_chart(
+                ranked_bar_chart(frame, "customer_state", "item_revenue", "客户所在州商品金额"),
+                width="stretch",
+            )
+
+    with st.container(border=True):
         st.subheader("核心品类 Top 10")
         st.plotly_chart(
             ranked_bar_chart(products.head(10), "product_category", "item_revenue", "品类商品金额 Top 10"),
-            use_container_width=True,
+            width="stretch",
         )
     for metric, title in [
         ("item_revenue", "月度商品金额"),
@@ -107,7 +149,7 @@ else:
         ("active_customers", "月度购买用户数"),
     ]:
         with st.container(border=True):
-            st.plotly_chart(line_chart(monthly, "month_start", metric, title), use_container_width=True)
+            st.plotly_chart(line_chart(monthly, "month_start", metric, title), width="stretch")
     with st.container(border=True):
         render_insight(
             "管理层结论提示",

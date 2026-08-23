@@ -59,12 +59,12 @@ else:
     )
     left, right = st.columns(2)
     with left, st.container(border=True):
-        st.plotly_chart(bubble_scatter_chart(products, "order_count", "item_revenue", "average_review_score", "品类商品金额与订单量", color="product_category"), use_container_width=True)
+        st.plotly_chart(bubble_scatter_chart(products, "order_count", "item_revenue", "average_review_score", "品类商品金额与订单量", color="product_category"), width="stretch")
         st.caption("横轴为订单数，纵轴为商品金额，气泡面积为平均评分。")
     with right, st.container(border=True):
-        st.plotly_chart(ranked_bar_chart(states, "customer_state", "delayed_delivery_rate_pct", "客户收货州延迟率"), use_container_width=True)
-        st.dataframe(display_dataframe(states), use_container_width=True, hide_index=True)
+        st.plotly_chart(ranked_bar_chart(states, "customer_state", "delayed_delivery_rate_pct", "客户收货州延迟率"), width="stretch")
+        st.dataframe(display_dataframe(states), width="stretch", hide_index=True)
     with st.container(border=True):
-        st.plotly_chart(bubble_scatter_chart(ratings, "average_delivery_vs_estimate_days", "average_review_score", "order_count", "相对预计送达天数与评分"), use_container_width=True)
+        st.plotly_chart(bubble_scatter_chart(ratings, "average_delivery_vs_estimate_days", "average_review_score", "order_count", "相对预计送达天数与评分"), width="stretch")
         st.caption("配送延迟与评分差异是相关性线索，不能仅凭该图做因果解释。")
     render_insight("行动建议", "优先排查高订单量、高延迟率且低评分的客户收货州；再结合相应品类与物流链路安排改进实验。")

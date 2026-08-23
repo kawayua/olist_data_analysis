@@ -70,3 +70,52 @@ def test_dashboard_tables_use_display_ready_dataframes():
     ]:
         content = page.read_text(encoding="utf-8")
         assert "display_dataframe(" in content
+
+
+def test_home_redirects_to_the_operating_overview_page():
+    content = Path("app/Home.py").read_text(encoding="utf-8")
+
+    assert 'st.switch_page("pages/1_经营总览.py")' in content
+
+
+def test_operating_overview_uses_two_brazil_state_maps():
+    content = Path("app/pages/1_经营总览.py").read_text(encoding="utf-8")
+
+    assert "brazil_state_polygon_map" in content
+    assert 'color_metric="payment_value"' in content
+    assert 'color_metric="item_revenue"' in content
+    assert '"average_review_score"' in content
+
+
+def test_dashboard_uses_native_responsive_kpi_cards_and_theme_tokens():
+    kpi_content = Path("app/components/kpis.py").read_text(encoding="utf-8")
+    theme_content = Path(".streamlit/config.toml").read_text(encoding="utf-8")
+
+    assert "st.container(horizontal=True" in kpi_content
+    assert "st.metric(label, value, border=True)" in kpi_content
+    assert "[theme]" in theme_content
+    assert 'primaryColor = "#1E40AF"' in theme_content
+
+
+def test_operating_overview_labels_map_interaction_and_mobile_fallback():
+    content = Path("app/pages/1_经营总览.py").read_text(encoding="utf-8")
+
+    assert "州级经营表现" in content
+    assert "触屏设备可使用图表工具栏缩放查看" in content
+
+
+def test_analysis_pages_use_responsive_chart_width_and_shared_kpi_layout():
+    pages = [Path(f"app/pages/{index}_{name}.py") for index, name in [
+        ("2", "增长诊断"),
+        ("3", "留存复购"),
+        ("4", "客户价值"),
+        ("5", "商品与履约"),
+    ]]
+
+    for page in pages:
+        content = page.read_text(encoding="utf-8")
+        assert "use_container_width" not in content
+        assert 'width="stretch"' in content
+
+    for page in pages[1:3]:
+        assert "render_kpis(" in page.read_text(encoding="utf-8")
