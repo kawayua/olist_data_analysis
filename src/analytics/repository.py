@@ -109,7 +109,23 @@ class AnalyticsRepository:
                 first_order_freight_revenue,
                 first_order_payment_value,
                 first_order_delivery_days,
-                first_order_distinct_category_count
+                first_order_distinct_category_count,
+                customer_state,
+                first_order_primary_category,
+                first_order_max_item_revenue,
+                first_order_average_item_revenue,
+                first_order_freight_rate,
+                first_order_payment_type_count,
+                first_order_max_installments,
+                first_order_seller_state_count,
+                first_order_cross_state,
+                first_order_estimated_delivery_days,
+                first_order_delivery_vs_estimate_days,
+                first_order_is_late,
+                first_order_purchase_month,
+                first_order_purchase_weekday,
+                first_order_approval_hours,
+                first_order_carrier_handoff_hours
             FROM marts.ml_customer_features
             ORDER BY prediction_time DESC, customer_key
             """

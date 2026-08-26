@@ -29,6 +29,30 @@ from src.ml.train import (
 )
 
 
+def aggregate_feature_importance(
+    transformed_names: list[str],
+    importances: np.ndarray,
+    feature_columns: tuple[str, ...],
+) -> dict[str, float]:
+    """Aggregate transformed numeric and one-hot weights to source fields."""
+    if len(transformed_names) != len(importances):
+        raise ValueError("transformed feature names and importances must align")
+    totals = {feature: 0.0 for feature in feature_columns}
+    for name, importance in zip(transformed_names, importances, strict=True):
+        source = name.split("__", 1)[-1]
+        matched = next(
+            (
+                feature
+                for feature in feature_columns
+                if source == feature or source.startswith(f"{feature}_")
+            ),
+            None,
+        )
+        if matched is not None:
+            totals[matched] += float(abs(importance))
+    return totals
+
+
 def build_metrics_report(
     candidate_metrics: dict[str, ModelMetrics],
     selected_name: str,
@@ -147,14 +171,20 @@ def main() -> None:
         importances = np.abs(np.asarray(classifier.coef_[0], dtype=float))
     else:
         importances = np.asarray(classifier.feature_importances_, dtype=float)
+    transformed_names = list(
+        selected_result.model.named_steps["preprocessor"].get_feature_names_out()
+    )
+    aggregated_importance = aggregate_feature_importance(
+        transformed_names, importances, FEATURE_COLUMNS
+    )
     feature_importance = sorted(
         (
             {
                 "feature": feature,
                 "feature_meaning": FEATURE_MEANINGS[feature],
-                "importance": float(importance),
+                "importance": importance,
             }
-            for feature, importance in zip(FEATURE_COLUMNS, importances, strict=True)
+            for feature, importance in aggregated_importance.items()
         ),
         key=lambda item: item["importance"],
         reverse=True,

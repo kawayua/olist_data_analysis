@@ -16,6 +16,22 @@ FEATURE_MEANINGS = {
     "first_order_payment_value": "首笔订单支付金额",
     "first_order_delivery_days": "首笔订单配送时长（天）",
     "first_order_distinct_category_count": "首笔订单商品品类数",
+    "first_order_max_item_revenue": "首笔订单最高商品金额",
+    "first_order_average_item_revenue": "首笔订单平均商品金额",
+    "first_order_freight_rate": "首笔订单运费占比",
+    "first_order_payment_type_count": "首笔订单支付方式数",
+    "first_order_max_installments": "首笔订单最大分期数",
+    "first_order_seller_state_count": "首笔订单卖家州数",
+    "first_order_estimated_delivery_days": "首笔订单预计配送天数",
+    "first_order_delivery_vs_estimate_days": "首笔订单相对预计配送天数",
+    "first_order_purchase_month": "首笔订单下单月份",
+    "first_order_purchase_weekday": "首笔订单下单星期",
+    "first_order_approval_hours": "首笔订单审批耗时（小时）",
+    "first_order_carrier_handoff_hours": "首笔订单交运耗时（小时）",
+    "customer_state": "客户所在州",
+    "first_order_primary_category": "首笔订单主商品品类",
+    "first_order_cross_state": "首笔订单是否跨州",
+    "first_order_is_late": "首笔订单是否延迟",
 }
 
 FORBIDDEN_FUTURE_FIELDS = [

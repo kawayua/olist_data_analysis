@@ -12,6 +12,19 @@ from src.ml.evaluate import (
     evaluate_ranking,
     lift_at_fraction,
 )
+
+
+def test_evaluate_at_fractions_reports_business_contact_ranges():
+    """A missing contact range would hide whether a small campaign is preferable."""
+    from src.ml.evaluate import evaluate_at_fractions
+
+    labels = np.array([1] * 10 + [0] * 90)
+    scores = np.linspace(1.0, 0.0, 100)
+
+    metrics = evaluate_at_fractions(labels, scores)
+
+    assert set(metrics) == {"1%", "3%", "5%", "10%"}
+    assert metrics["10%"].lift_at_k == 10.0
 from src.ml.train import (
     business_baseline_scores,
     predict_probabilities,

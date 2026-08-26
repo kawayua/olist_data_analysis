@@ -98,3 +98,63 @@ def test_ml_customer_features_exposes_prediction_audit_columns():
         "eligible_for_90d",
         "repurchased_within_90d",
     } <= columns
+
+
+def test_ml_customer_features_exposes_extended_time_safe_columns():
+    """A missing first-order field would weaken ranking without being visible."""
+    _rebuild_marts()
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        columns = set(
+            connection.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'marts'
+                      AND table_name = 'ml_customer_features'
+                    """
+                )
+            ).scalars()
+        )
+
+    assert {
+        "customer_state",
+        "first_order_primary_category",
+        "first_order_max_item_revenue",
+        "first_order_average_item_revenue",
+        "first_order_freight_rate",
+        "first_order_payment_type_count",
+        "first_order_max_installments",
+        "first_order_seller_state_count",
+        "first_order_cross_state",
+        "first_order_estimated_delivery_days",
+        "first_order_delivery_vs_estimate_days",
+        "first_order_is_late",
+        "first_order_purchase_month",
+        "first_order_purchase_weekday",
+        "first_order_approval_hours",
+        "first_order_carrier_handoff_hours",
+    } <= columns
+
+
+def test_warehouse_rebuilds_when_marts_reference_customer_dimension():
+    """Dropping warehouse dimensions before marts leaves rebuilds permanently blocked."""
+    project_root = Path(__file__).resolve().parents[2]
+    warehouse_result = subprocess.run(
+        [sys.executable, "scripts/build_warehouse.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert warehouse_result.returncode == 0, warehouse_result.stderr
+    marts_result = subprocess.run(
+        [sys.executable, "scripts/build_marts.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert marts_result.returncode == 0, marts_result.stderr

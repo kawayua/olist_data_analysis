@@ -21,6 +21,8 @@ from src.analytics.metrics import get_metric_definition
 from src.ml.roi import Scenario, SimulationResult, simulate_roi
 from src.ml.train import FEATURE_COLUMNS
 
+AGENT_FEATURE_COLUMNS = FEATURE_COLUMNS[:6]
+
 
 class ReadOnlyQueryExecutor(Protocol):
     """Execute an already validated analytical query without write privileges."""
@@ -124,12 +126,12 @@ class AnalysisTools:
 
     def predict_repurchase(self, features: dict[str, Any]) -> dict[str, float]:
         """Score exactly the six approved first-order features."""
-        missing = set(FEATURE_COLUMNS).difference(features)
+        missing = set(AGENT_FEATURE_COLUMNS).difference(features)
         if missing:
             raise ValueError("missing required prediction features")
         feature_frame = pd.DataFrame(
-            [{column: features[column] for column in FEATURE_COLUMNS}],
-            columns=list(FEATURE_COLUMNS),
+            [{column: features[column] for column in AGENT_FEATURE_COLUMNS}],
+            columns=list(AGENT_FEATURE_COLUMNS),
         )
         probability = float(self._predictor(feature_frame))
         if not 0.0 <= probability <= 1.0:

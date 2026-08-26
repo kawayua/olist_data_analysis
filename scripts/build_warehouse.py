@@ -8,6 +8,23 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 DROP_DERIVED_TABLES_SQL = """
+DROP TABLE IF EXISTS marts.customer_segment_strategy;
+DROP TABLE IF EXISTS marts.ml_customer_features;
+DROP TABLE IF EXISTS marts.delivery_rating_analysis;
+DROP TABLE IF EXISTS marts.repurchase_intervals;
+DROP TABLE IF EXISTS marts.repurchase_behavior;
+DROP TABLE IF EXISTS marts.customer_value_analysis;
+DROP TABLE IF EXISTS marts.customer_360;
+DROP TABLE IF EXISTS marts.state_monthly_performance;
+DROP TABLE IF EXISTS marts.state_product_performance;
+DROP TABLE IF EXISTS marts.product_monthly_performance;
+DROP TABLE IF EXISTS marts.state_performance;
+DROP TABLE IF EXISTS marts.delivery_order_analysis;
+DROP TABLE IF EXISTS marts.delivery_experience;
+DROP TABLE IF EXISTS marts.product_performance;
+DROP TABLE IF EXISTS marts.repurchase_horizons;
+DROP TABLE IF EXISTS marts.cohort_retention;
+DROP TABLE IF EXISTS marts.monthly_growth;
 DROP TABLE IF EXISTS warehouse.fact_reviews;
 DROP TABLE IF EXISTS warehouse.fact_payments;
 DROP TABLE IF EXISTS warehouse.fact_order_items;

@@ -21,6 +21,7 @@ SELECT
     customers.customer_key,
     dates.date_key AS purchase_date_key,
     orders.customer_id AS source_customer_id,
+    source_customers.customer_state,
     orders.order_status,
     orders.purchased_at,
     orders.approved_at,

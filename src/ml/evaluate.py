@@ -95,3 +95,15 @@ def evaluate_probabilities(
         top_fraction,
         brier_score=float(brier_score_loss(labels, scores)),
     )
+
+
+def evaluate_at_fractions(
+    y_true: np.ndarray,
+    scores: np.ndarray,
+    fractions: tuple[float, ...] = (0.01, 0.03, 0.05, 0.10),
+) -> dict[str, ModelMetrics]:
+    """Evaluate a ranking at the campaign contact ranges shown to users."""
+    return {
+        f"{fraction:.0%}": evaluate_ranking(y_true, scores, top_fraction=fraction)
+        for fraction in fractions
+    }

@@ -73,6 +73,22 @@ def test_metrics_report_preserves_selection_calibration_and_final_test_metrics()
     assert "accuracy" not in keys(report)
 
 
+def test_feature_importance_aggregates_one_hot_columns_to_source_feature():
+    """One-hot categories must not overflow the model-card feature contract."""
+    from scripts.train_model import aggregate_feature_importance
+
+    result = aggregate_feature_importance(
+        ["numeric__first_order_item_revenue", "categorical__customer_state_SP", "categorical__customer_state_RJ"],
+        np.array([0.2, 0.3, 0.1]),
+        ("first_order_item_revenue", "customer_state"),
+    )
+
+    assert result == {
+        "first_order_item_revenue": 0.2,
+        "customer_state": 0.4,
+    }
+
+
 def _small_training_frame() -> pd.DataFrame:
     return pd.DataFrame(
         {

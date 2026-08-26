@@ -119,3 +119,11 @@ def test_analysis_pages_use_responsive_chart_width_and_shared_kpi_layout():
 
     for page in pages[1:3]:
         assert "render_kpis(" in page.read_text(encoding="utf-8")
+
+
+def test_marketing_page_presents_simulated_experiment_not_claimed_roi():
+    content = Path("app/pages/6_营销ROI模拟器.py").read_text(encoding="utf-8")
+
+    for term in ("营销实验与增量评估", "模拟实验", "Top 1%", "Top 3%", "Top 5%", "Top 10%", "真实数据接入契约", "模拟 uplift 名单排序演示"):
+        assert term in content
+    assert "use_container_width" not in content

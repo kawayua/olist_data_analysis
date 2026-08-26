@@ -12,18 +12,39 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from src.ml.evaluate import ModelMetrics
 
-FEATURE_COLUMNS = (
+NUMERIC_FEATURE_COLUMNS = (
     "first_order_item_count",
     "first_order_item_revenue",
     "first_order_freight_revenue",
     "first_order_payment_value",
     "first_order_delivery_days",
     "first_order_distinct_category_count",
+    "first_order_max_item_revenue",
+    "first_order_average_item_revenue",
+    "first_order_freight_rate",
+    "first_order_payment_type_count",
+    "first_order_max_installments",
+    "first_order_seller_state_count",
+    "first_order_estimated_delivery_days",
+    "first_order_delivery_vs_estimate_days",
+    "first_order_purchase_month",
+    "first_order_purchase_weekday",
+    "first_order_approval_hours",
+    "first_order_carrier_handoff_hours",
 )
+
+CATEGORICAL_FEATURE_COLUMNS = (
+    "customer_state",
+    "first_order_primary_category",
+    "first_order_cross_state",
+    "first_order_is_late",
+)
+
+FEATURE_COLUMNS = (*NUMERIC_FEATURE_COLUMNS, *CATEGORICAL_FEATURE_COLUMNS)
 
 
 @dataclass(frozen=True)
@@ -36,13 +57,40 @@ class TrainingResult:
 
 
 def _numeric_preprocessor(include_scaler: bool = False) -> ColumnTransformer:
-    steps = [("imputer", SimpleImputer(strategy="median"))]
+    steps = [("imputer", SimpleImputer(strategy="median", keep_empty_features=True))]
     if include_scaler:
         steps.append(("scaler", StandardScaler()))
     return ColumnTransformer(
-        [("numeric", Pipeline(steps), list(FEATURE_COLUMNS))],
+        [
+            ("numeric", Pipeline(steps), list(NUMERIC_FEATURE_COLUMNS)),
+            (
+                "categorical",
+                Pipeline(
+                    [
+                        (
+                            "imputer",
+                            SimpleImputer(
+                                strategy="most_frequent", keep_empty_features=True
+                            ),
+                        ),
+                        (
+                            "encoder",
+                            OneHotEncoder(
+                                handle_unknown="ignore", sparse_output=False
+                            ),
+                        ),
+                    ]
+                ),
+                list(CATEGORICAL_FEATURE_COLUMNS),
+            ),
+        ],
         remainder="drop",
     )
+
+
+def _feature_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return the complete model contract, leaving absent fields as imputable nulls."""
+    return frame.reindex(columns=FEATURE_COLUMNS)
 
 
 def build_logistic_pipeline() -> Pipeline:
@@ -103,9 +151,6 @@ def build_lightgbm_pipeline() -> Pipeline:
 
 
 def _validate_training_frame(frame: pd.DataFrame, label_column: str) -> pd.DataFrame:
-    missing_features = set(FEATURE_COLUMNS).difference(frame.columns)
-    if missing_features:
-        raise ValueError(f"missing required features: {sorted(missing_features)}")
     if label_column not in frame:
         raise ValueError(f"missing label column: {label_column}")
     return frame.dropna(subset=[label_column]).copy()
@@ -124,8 +169,9 @@ def train_candidates(
     frame = _validate_training_frame(training_frame, label_column)
     labels = frame[label_column].astype(int)
     model = build_logistic_pipeline()
-    model.fit(frame.loc[:, FEATURE_COLUMNS], labels)
-    scores = model.predict_proba(frame.loc[:, FEATURE_COLUMNS])[:, 1]
+    features = _feature_frame(frame)
+    model.fit(features, labels)
+    scores = model.predict_proba(features)[:, 1]
     return TrainingResult(model=model, train_frame=frame, train_scores=scores)
 
 
@@ -139,7 +185,7 @@ def train_candidate_models(
     stopping_frame = _validate_training_frame(early_stopping_frame, label_column)
     fitting_labels = fitting_frame[label_column].astype(int)
     stopping_labels = stopping_frame[label_column].astype(int)
-    fitting_features = fitting_frame.loc[:, FEATURE_COLUMNS]
+    fitting_features = _feature_frame(fitting_frame)
 
     results: dict[str, TrainingResult] = {}
     for name, model in {
@@ -157,9 +203,7 @@ def train_candidate_models(
     preprocessor = lightgbm_model.named_steps["preprocessor"]
     classifier = lightgbm_model.named_steps["classifier"]
     transformed_fitting_features = preprocessor.fit_transform(fitting_features)
-    transformed_stopping_features = preprocessor.transform(
-        stopping_frame.loc[:, FEATURE_COLUMNS]
-    )
+    transformed_stopping_features = preprocessor.transform(_feature_frame(stopping_frame))
     classifier.fit(
         transformed_fitting_features,
         fitting_labels,
@@ -177,7 +221,7 @@ def train_candidate_models(
 def predict_probabilities(result: TrainingResult, frame: pd.DataFrame) -> np.ndarray:
     """Return validated positive-class candidate probabilities for feature inputs."""
     probabilities = np.asarray(
-        result.model.predict_proba(frame.loc[:, FEATURE_COLUMNS])[:, 1], dtype=float
+        result.model.predict_proba(_feature_frame(frame))[:, 1], dtype=float
     )
     if not np.all((0.0 <= probabilities) & (probabilities <= 1.0)):
         raise ValueError("candidate did not return probabilities")

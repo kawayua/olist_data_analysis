@@ -112,6 +112,8 @@ def test_repository_reads_only_time_safe_features_for_model_scoring(monkeypatch)
     assert frame["customer_key"].tolist() == [42]
     assert "marts.ml_customer_features" in captured["sql"]
     assert "first_order_item_revenue" in captured["sql"]
+    assert "first_order_primary_category" in captured["sql"]
+    assert "first_order_delivery_vs_estimate_days" in captured["sql"]
     assert "SELECT *" not in captured["sql"].upper()
     assert "repurchased_within_90d" not in captured["sql"]
     assert "future_" not in captured["sql"]
