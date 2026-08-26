@@ -95,6 +95,8 @@ def _validate_tables(expression: exp.Expression, allowed_views: set[str]) -> Non
 
 def _validate_functions(expression: exp.Expression) -> None:
     for function in expression.find_all(exp.Func):
+        if isinstance(function, (exp.And, exp.Or)):
+            continue
         if function.sql_name().upper() not in ALLOWED_FUNCTIONS:
             _raise_unsafe("query uses a non-analytical function")
 

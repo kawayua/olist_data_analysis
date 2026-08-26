@@ -39,6 +39,8 @@ ALLOWED_AGENT_VIEWS = {
     "marts.repurchase_behavior",
     "marts.state_performance",
     "marts.state_monthly_performance",
+    "marts.product_monthly_performance",
+    "marts.state_product_performance",
 }
 
 
@@ -123,6 +125,14 @@ def answer_for_question(
     return AnalysisAgent(client, tools).run(question)
 
 
+def append_conversation_turn(
+    history: list[dict[str, object]], question: str, answer: AgentAnswer
+) -> list[dict[str, object]]:
+    """Replace any previous turn with the current auditable question and answer."""
+    del history
+    return [{"question": question, "answer": answer}]
+
+
 def _render_answer(answer: AgentAnswer) -> None:
     st.subheader("分析回答")
     st.write(answer.answer)
@@ -164,6 +174,18 @@ def _render_answer(answer: AgentAnswer) -> None:
         )
 
 
+def _render_conversation(history: list[dict[str, object]]) -> None:
+    for turn in history:
+        question = turn["question"]
+        answer = turn["answer"]
+        if not isinstance(question, str) or not isinstance(answer, AgentAnswer):
+            continue
+        with st.chat_message("user"):
+            st.write(question)
+        with st.chat_message("assistant", avatar=":material/smart_toy:"):
+            _render_answer(answer)
+
+
 def main() -> None:
     st.set_page_config(page_title="AI分析助手", page_icon="🤖", layout="wide")
     apply_dashboard_theme()
@@ -180,13 +202,25 @@ def main() -> None:
     else:
         st.success("实时模式已启用：模型调用仍只能使用受控工具。")
 
-    question = st.chat_input("例如：最近完整月份的商品金额变化如何？")
-    answer = (
-        answer_for_question(question, settings)
-        if question and live_ready
-        else build_demo_answer()
+    history = st.session_state.setdefault("ai_assistant_history", [])
+    question = st.chat_input(
+        "例如：最近完整月份的商品金额变化如何？", submit_mode="disable"
     )
-    _render_answer(answer)
+    if question:
+        answer = (
+            answer_for_question(question, settings)
+            if live_ready
+            else build_demo_answer()
+        )
+        st.session_state.ai_assistant_history = append_conversation_turn(
+            history, question, answer
+        )
+        history = st.session_state.ai_assistant_history
+
+    if history:
+        _render_conversation(history)
+    else:
+        _render_answer(build_demo_answer())
     render_insight(
         "使用边界",
         "模型只提出工具调用；SQL、预测与营销模拟仍由项目的白名单、参数校验和只读执行层控制。",

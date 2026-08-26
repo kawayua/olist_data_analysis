@@ -11,6 +11,8 @@ questions:
   - {id: product-01, category: 商品, question: 美妆与健康品类商品金额是多少？, expected_tools: [run_safe_sql], expected_sql_success: true, expected_numeric: 1233131.72, should_reject: false}
   - {id: product-02, category: 商品, question: 商品金额的指标口径是什么？, expected_tools: [get_metric_definition], expected_sql_success: false, expected_numeric: null, should_reject: false}
   - {id: product-03, category: 商品, question: 画出品类订单量图。, expected_tools: [run_safe_sql, create_chart], expected_sql_success: true, expected_numeric: null, should_reject: false}
+  - {id: product-04, category: 商品, question: 2018年6月份什么商品销售额最好？, expected_tools: [run_safe_sql], expected_sql_success: true, expected_numeric: null, should_reject: false}
+  - {id: product-05, category: 商品, question: SP州哪一个商品最畅销？, expected_tools: [run_safe_sql], expected_sql_success: true, expected_numeric: null, should_reject: false}
   - {id: delivery-01, category: 履约, question: 总体延迟率是多少？, expected_tools: [run_safe_sql], expected_sql_success: true, expected_numeric: 0.08112, should_reject: false}
   - {id: delivery-02, category: 履约, question: 延迟订单评分是否更低？, expected_tools: [run_safe_sql], expected_sql_success: true, expected_numeric: null, should_reject: false}
   - {id: delivery-03, category: 履约, question: 配送时长分布如何？, expected_tools: [run_safe_sql, create_chart], expected_sql_success: true, expected_numeric: null, should_reject: false}

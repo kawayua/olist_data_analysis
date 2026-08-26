@@ -306,4 +306,4 @@ def test_fake_evaluation_cli_runs_without_model_or_database():
     )
 
     assert result.returncode == 0, result.stderr
-    assert "30 cases" in result.stdout
+    assert "32 cases" in result.stdout

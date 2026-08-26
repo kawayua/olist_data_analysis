@@ -31,6 +31,11 @@ def test_safe_sql_uses_validated_query_and_returns_bounded_records():
 
     assert "LIMIT 500" in executor.sql.upper()
     assert result["rows"] == [{"month_start": "2017-01-01", "item_revenue": 100.0}]
+    assert result["data_range"] == {
+        "field": "month_start",
+        "start": "2017-01-01",
+        "end": "2017-01-01",
+    }
 
 
 def test_safe_sql_serializes_dates_decimals_and_missing_values_for_json():

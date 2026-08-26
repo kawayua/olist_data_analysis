@@ -21,6 +21,8 @@ def main() -> None:
     run_sql(engine, "DROP TABLE IF EXISTS marts.customer_value_analysis")
     run_sql(engine, "DROP TABLE IF EXISTS marts.customer_360")
     run_sql(engine, "DROP TABLE IF EXISTS marts.state_monthly_performance")
+    run_sql(engine, "DROP TABLE IF EXISTS marts.state_product_performance")
+    run_sql(engine, "DROP TABLE IF EXISTS marts.product_monthly_performance")
     run_sql(engine, "DROP TABLE IF EXISTS marts.state_performance")
     run_sql(engine, "DROP TABLE IF EXISTS marts.delivery_order_analysis")
     run_sql(engine, "DROP TABLE IF EXISTS marts.delivery_experience")
@@ -43,6 +45,8 @@ def main() -> None:
         "038_repurchase_behavior.sql",
         "039_delivery_rating_analysis.sql",
         "040_state_monthly_performance.sql",
+        "041_product_monthly_performance.sql",
+        "042_state_product_performance.sql",
     ):
         path = PROJECT_ROOT / "sql" / "marts" / filename
         run_sql_file(engine, path)

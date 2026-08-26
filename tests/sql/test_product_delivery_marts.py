@@ -302,3 +302,93 @@ def test_product_performance_exposes_average_review_score():
         ).scalar_one()
 
     assert invalid == 0
+
+
+def test_product_monthly_performance_has_one_row_per_month_and_category_and_reconciles():
+    project_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "scripts/build_marts.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Applied sql/marts/041_product_monthly_performance.sql" in result.stdout
+
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        rows, duplicates, reconciliation_difference = connection.execute(
+            text(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM marts.product_monthly_performance),
+                    (
+                        SELECT COUNT(*) - COUNT(DISTINCT (month_start, product_category))
+                        FROM marts.product_monthly_performance
+                    ),
+                    (
+                        SELECT ABS(
+                            (SELECT SUM(item_revenue)
+                             FROM marts.product_monthly_performance)
+                            -
+                            (SELECT SUM(item_revenue)
+                             FROM marts.product_performance)
+                        )
+                    )
+                """
+            )
+        ).one()
+
+    assert rows > 0
+    assert duplicates == 0
+    assert reconciliation_difference == 0
+
+
+def test_state_product_performance_has_governed_grain_and_reconciles():
+    project_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "scripts/build_marts.py"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Applied sql/marts/042_state_product_performance.sql" in result.stdout
+
+    engine = get_engine(get_settings())
+    with engine.connect() as connection:
+        rows, duplicates, reconciliation_difference, sp_rows = connection.execute(
+            text(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM marts.state_product_performance),
+                    (
+                        SELECT COUNT(*) - COUNT(DISTINCT (customer_state, product_category))
+                        FROM marts.state_product_performance
+                    ),
+                    (
+                        SELECT ABS(
+                            (SELECT SUM(item_revenue)
+                             FROM marts.state_product_performance)
+                            -
+                            (SELECT SUM(item_revenue)
+                             FROM marts.product_performance)
+                        )
+                    ),
+                    (
+                        SELECT COUNT(*)
+                        FROM marts.state_product_performance
+                        WHERE customer_state = 'SP'
+                    )
+                """
+            )
+        ).one()
+
+    assert rows > 0
+    assert duplicates == 0
+    assert reconciliation_difference == 0
+    assert sp_rows > 0

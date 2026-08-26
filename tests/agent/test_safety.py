@@ -13,6 +13,24 @@ def test_allowed_select_receives_default_limit():
     assert "LIMIT 500" in actual.upper()
 
 
+def test_safe_sql_allows_monthly_category_trend_filters_with_and():
+    sql = """
+        SELECT month_start, item_revenue
+        FROM marts.product_monthly_performance
+        WHERE product_category = 'health_beauty'
+          AND month_start >= DATE '2017-01-01'
+          AND month_start < DATE '2018-01-01'
+        ORDER BY month_start
+    """
+
+    normalized = validate_read_only_sql(
+        sql, {"marts.product_monthly_performance"}
+    )
+
+    assert "product_category = 'health_beauty'" in normalized
+    assert "ORDER BY month_start" in normalized
+
+
 def test_allowed_union_all_receives_default_limit():
     actual = validate_read_only_sql(
         "select month_start from marts.monthly_growth "

@@ -82,10 +82,14 @@ class AnalysisTools:
         """Validate SQL before execution and serialize no more than 2,000 rows."""
         normalized_sql = validate_read_only_sql(sql, self._allowed_views)
         frame = self._executor.read_only_query(normalized_sql)
-        return {
+        result: dict[str, object] = {
             "sql": normalized_sql,
             "rows": _json_safe_records(frame.head(2_000)),
         }
+        data_range = _infer_data_range(frame)
+        if data_range is not None:
+            result["data_range"] = data_range
+        return result
 
     def get_metric_definition(self, name: str) -> dict[str, str]:
         """Return a governed metric contract, not an ad-hoc calculation."""
@@ -234,6 +238,33 @@ def _object_schema(
 def _json_safe_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     """Serialize DataFrame records so an agent result can always become JSON."""
     return json.loads(frame.to_json(orient="records", date_format="iso"))
+
+
+_TIME_RANGE_COLUMNS = (
+    "month_start",
+    "cohort_month",
+    "activity_month",
+    "prediction_time",
+    "first_purchase_at",
+    "last_purchase_at",
+    "observed_through",
+)
+
+
+def _infer_data_range(frame: pd.DataFrame) -> dict[str, str] | None:
+    """Return the observed range of the first governed temporal result field."""
+    for column in _TIME_RANGE_COLUMNS:
+        if column not in frame.columns:
+            continue
+        values = pd.to_datetime(frame[column], errors="coerce").dropna()
+        if values.empty:
+            continue
+        return {
+            "field": column,
+            "start": values.min().date().isoformat(),
+            "end": values.max().date().isoformat(),
+        }
+    return None
 
 
 def _normalize_scenario(value: Scenario | dict[str, Any]) -> Scenario:

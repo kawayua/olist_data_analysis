@@ -102,6 +102,52 @@ def test_agent_gives_model_safe_correction_hints_for_metric_and_sql_failures():
     assert "marts.state_monthly_performance" in client.seen_messages[0][0]["content"]
 
 
+def test_agent_prompt_catalog_routes_monthly_category_revenue_to_product_mart():
+    client = ScriptedClient([LLMResponse("范围内暂未查询。", [])])
+
+    AnalysisAgent(client, MultiFakeTools()).run("2018年6月份什么商品销售额最好？")
+
+    prompt = client.seen_messages[0][0]["content"]
+    assert "marts.product_monthly_performance" in prompt
+    assert "month_start" in prompt
+    assert "product_category" in prompt
+    assert "ORDER BY item_revenue DESC LIMIT 1" in prompt
+
+
+def test_agent_prompt_catalog_lists_every_governed_query_mart():
+    client = ScriptedClient([LLMResponse("范围内暂未查询。", [])])
+
+    AnalysisAgent(client, MultiFakeTools()).run("有哪些分析数据？")
+
+    prompt = client.seen_messages[0][0]["content"]
+    expected_marts = {
+        "marts.monthly_growth",
+        "marts.cohort_retention",
+        "marts.customer_segment_strategy",
+        "marts.customer_value_analysis",
+        "marts.product_performance",
+        "marts.delivery_experience",
+        "marts.delivery_rating_analysis",
+        "marts.repurchase_behavior",
+        "marts.state_performance",
+        "marts.state_monthly_performance",
+        "marts.product_monthly_performance",
+        "marts.state_product_performance",
+    }
+    assert all(mart in prompt for mart in expected_marts)
+    assert "先调用 get_metric_definition" in prompt
+
+
+def test_agent_prompt_routes_state_category_questions_to_state_product_mart():
+    client = ScriptedClient([LLMResponse("范围内暂未查询。", [])])
+
+    AnalysisAgent(client, MultiFakeTools()).run("SP州哪一个商品最畅销？")
+
+    prompt = client.seen_messages[0][0]["content"]
+    assert "marts.state_product_performance" in prompt
+    assert "customer_state = 'SP'" in prompt
+
+
 def _definition(name: str) -> ToolDefinition:
     schemas = {
         "run_safe_sql": {"sql": {"type": "string"}},
@@ -213,6 +259,31 @@ def test_agent_stops_after_two_identical_failed_tool_calls():
     assert len(client.seen_messages) == 2
     assert [item.status for item in answer.tool_trace] == ["error", "error"]
     assert "连续失败" in answer.limitations[0]
+
+
+def test_agent_stops_after_two_rejected_sql_calls_even_when_sql_differs():
+    class RejectingSqlTools(MultiFakeTools):
+        def run_safe_sql(self, sql: str) -> dict[str, Any]:
+            self.calls.append(("run_safe_sql", sql))
+            raise UnsafeQueryError("rejected")
+
+    tools = RejectingSqlTools()
+    client = ScriptedClient(
+        [
+            LLMResponse("", [_call("s1", "run_safe_sql", {"sql": "SELECT 1"})]),
+            LLMResponse("", [_call("s2", "run_safe_sql", {"sql": "SELECT 2"})]),
+            LLMResponse("不应继续调用", []),
+        ]
+    )
+
+    answer = AnalysisAgent(client, tools, max_steps=6).run("查询")
+
+    assert len(client.seen_messages) == 2
+    assert [item.result_summary for item in answer.tool_trace] == [
+        "query_rejected",
+        "query_rejected",
+    ]
+    assert "SQL" in answer.limitations[0]
 
 
 def test_agent_stops_at_configured_step_limit():

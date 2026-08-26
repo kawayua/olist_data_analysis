@@ -115,8 +115,42 @@ class AnalysisAgent:
                     "item_revenue_aov、new_customers、returning_customers、"
                     "repeat_rate_30d、repeat_rate_60d、repeat_rate_90d、late_delivery_rate。"
                     "州维度销售额使用 marts.state_performance 的 customer_state 与 item_revenue；"
-                    "州维度且指定月份范围的销售额使用 marts.state_monthly_performance 的 "
+                "州维度且指定月份范围的销售额使用 marts.state_monthly_performance 的 "
                     "month_start、customer_state 与 item_revenue；"
+                    "数据目录：marts.monthly_growth（月度总体：month_start、item_revenue、"
+                    "order_count）；marts.product_performance（全周期商品品类：product_category、"
+                    "item_revenue、order_count）；marts.product_monthly_performance（月度商品品类："
+                    "month_start、product_category、item_revenue、order_count、is_complete_month）；"
+                    "marts.state_performance（全周期州：customer_state、item_revenue）；"
+                    "marts.state_monthly_performance（月度州：month_start、customer_state、"
+                    "item_revenue、is_complete_month）。"
+                    "marts.state_product_performance（州与商品品类：customer_state、"
+                    "product_category、item_revenue、order_count）。"
+                    "其余可查询表：marts.cohort_retention（cohort_month、activity_month、"
+                    "months_since_cohort、retention_rate_pct）；marts.customer_segment_strategy（"
+                    "customer_segment、customer_count、item_revenue、recommended_action）；"
+                    "marts.customer_value_analysis（customer_segment、customer_count、item_revenue、"
+                    "average_recency_days、average_frequency_orders）；marts.delivery_experience（"
+                    "delivery_status、order_count、average_delivery_days、average_review_score）；"
+                    "marts.delivery_rating_analysis（delivery_delay_bucket、order_count、"
+                    "average_delivery_vs_estimate_days、average_review_score）；"
+                    "marts.repurchase_behavior（first_purchase_category、horizon_days、"
+                    "eligible_customers、repurchased_customers、repurchase_rate_pct）。"
+                    "问题同时包含月份和商品品类时，必须使用 marts.product_monthly_performance；"
+                    "例如“2018年6月份什么商品销售额最好”只调用一次 run_safe_sql，SQL 为 "
+                    "SELECT product_category, item_revenue FROM marts.product_monthly_performance "
+                    "WHERE month_start = DATE '2018-06-01' ORDER BY item_revenue DESC LIMIT 1。"
+                    "问某品类在某年销售额变化时，返回 month_start 与 item_revenue，按 month_start 升序；"
+                    "例如 2017 年健康美容类：SELECT month_start, item_revenue FROM "
+                    "marts.product_monthly_performance WHERE product_category = 'health_beauty' "
+                    "AND month_start >= DATE '2017-01-01' AND month_start < DATE '2018-01-01' "
+                    "ORDER BY month_start。"
+                    "问题同时包含州和商品品类时，必须使用 marts.state_product_performance；"
+                    "例如“SP州哪一个商品最畅销”使用 SELECT product_category, item_revenue FROM "
+                    "marts.state_product_performance WHERE customer_state = 'SP' "
+                    "ORDER BY item_revenue DESC LIMIT 1。"
+                    "涉及业务指标的分析，先调用 get_metric_definition 获取指标口径，再调用 "
+                    "run_safe_sql；涉及时间的问题，查询结果必须保留对应的时间字段，以生成数据范围。"
                     "先取得一次受控查询结果，再直接给出结论，不要重复相同调用。"
                 ),
             },
@@ -129,6 +163,7 @@ class AnalysisAgent:
         limitations: list[str] = []
         last_failure: tuple[str, str] | None = None
         repeated_failures = 0
+        rejected_sql_calls = 0
 
         while len(trace) < self._max_steps:
             response = self._client.complete(messages, definitions)
@@ -176,6 +211,12 @@ class AnalysisAgent:
                 if repeated_failures >= 2:
                     limitations.append("相同工具调用连续失败，已安全停止。")
                     return self._answer("未能完成该分析。", trace, evidence, limitations)
+
+                if call.name == "run_safe_sql" and item.result_summary == "query_rejected":
+                    rejected_sql_calls += 1
+                    if rejected_sql_calls >= 2:
+                        limitations.append("两次 SQL 查询均被安全规则拒绝，已停止重试。")
+                        return self._answer("未能完成该分析。", trace, evidence, limitations)
 
                 if len(trace) == self._max_steps:
                     return self._step_limit_answer(trace, evidence, limitations)
